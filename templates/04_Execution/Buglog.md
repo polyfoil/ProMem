@@ -1,0 +1,29 @@
+# Bug Log
+
+> Track known issues, unresolved bugs, and failed approaches.
+> Updated by `pm-init` (TODO/FIXME scan) and during development.
+
+## Open Issues
+
+| ID | Severity | Description | File(s) | Status |
+|----|----------|-------------|---------|--------|
+|    |          |             |         |        |
+
+## Failed Approaches
+<!-- Document approaches that were tried and abandoned, so future agents
+     don't repeat the same mistakes. -->
+
+<!-- Example:
+### [Approach Title]
+- **Date:** YYYY-MM-DD
+- **What was tried:** [description]
+- **Why it failed:** [root cause]
+- **Lesson:** [what to do instead]
+-->
+
+## Resolved Issues
+<!-- Move resolved issues here with resolution notes. -->
+
+| ID | Description | Resolution | Date |
+|----|-------------|------------|------|
+|    |             |            |      |

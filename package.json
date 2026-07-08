@@ -1,0 +1,28 @@
+{
+  "name": "@promem/harness",
+  "version": "1.0.0",
+  "description": "Universal Project Memory & Agent Orchestration Harness",
+  "type": "module",
+  "main": "pm.js",
+  "bin": {
+    "promem": "./pm.js",
+    "pm": "./pm.js"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "memory",
+    "claude",
+    "cursor",
+    "framework",
+    "developer-tools"
+  ],
+  "author": "ProMem Contributors",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node tests/pm.test.js"
+  }
+}
