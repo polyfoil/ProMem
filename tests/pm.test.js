@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import { runInit, runUpdate, runMemory, runCompact, detectTechStack, loadTemplate } from '../pm.js';
+import { acquireLock, releaseLock } from '../src/utils/lock.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -145,7 +146,7 @@ test('pm init leaves existing entrypoint files untouched', async (t) => {
     assert.strictEqual(fs.readFileSync(claudeMdPath, 'utf8'), userRules, 'Existing CLAUDE.md must not be modified');
     assert.ok(result.stdout.toString().includes('left untouched'), 'The user should be told the file was left untouched');
     assert.ok(fs.existsSync(path.join(projectDir, '.cursorrules')), 'Missing .cursorrules should still be generated');
-    assert.ok(!fs.existsSync(path.join(projectDir, 'AGENTS.md')), 'AGENTS.md should not be created when absent');
+    assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')), 'Missing AGENTS.md should be generated (emerging cross-agent standard)');
   });
 
   cleanup(projectDir);
@@ -325,6 +326,35 @@ test('pm init refuses to plant a brain in a git repo subdirectory', async (t) =>
   });
 
   cleanup(repoDir);
+});
+
+test('stale lock recovery', async (t) => {
+  const dir = freshDir('temp-lock-fixture');
+  const lockPath = path.join(dir, '.pm.lock');
+
+  await t.test('a lock left by a dead process is taken over', () => {
+    fs.writeFileSync(lockPath, 'Locked by PID 99999999 at 2020-01-01T00:00:00.000Z\n');
+
+    const acquired = acquireLock(dir);
+
+    assert.strictEqual(acquired, lockPath, 'acquireLock should succeed by recovering the stale lock');
+    assert.ok(fs.readFileSync(lockPath, 'utf8').includes(`PID ${process.pid}`), 'The lock must now belong to the current process');
+    releaseLock(acquired);
+    assert.ok(!fs.existsSync(lockPath), 'releaseLock must remove the lock file');
+  });
+
+  await t.test('an aged lock is taken over even when its PID is alive', () => {
+    fs.writeFileSync(lockPath, `Locked by PID ${process.pid} at 2020-01-01T00:00:00.000Z\n`);
+    const elevenMinutesAgo = (Date.now() - 11 * 60 * 1000) / 1000;
+    fs.utimesSync(lockPath, elevenMinutesAgo, elevenMinutesAgo);
+
+    const acquired = acquireLock(dir);
+
+    assert.strictEqual(acquired, lockPath, 'acquireLock should recover a lock older than the staleness threshold');
+    releaseLock(acquired);
+  });
+
+  cleanup(dir);
 });
 
 test('pm link wires skills into detected agent roots (isolated fake home)', async (t) => {

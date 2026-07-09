@@ -65,3 +65,6 @@ a TX id manually.
 3. **Never delete entries.** Only append. Deletion happens during compaction.
 4. **One agent at a time.** If you see a very recent entry (same day, no
    "Next" suggesting handoff), confirm with the user before proceeding.
+5. **Close what you fix.** If your change resolves an open Buglog item, move
+   it to the Resolved table in the same session and cite your entry's TX id
+   in the resolution. A brain that lags the code erodes trust in the brain.

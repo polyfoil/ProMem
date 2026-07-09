@@ -30,6 +30,10 @@ export const ANATOMY_KEY_FILE_NAMES = new Set([
   'package.json', 'pyproject.toml', 'requirements.txt', 'README.md', 'main.py', 'index.js', 'app.py', 'pm.js'
 ]);
 
+// Files above this size are almost certainly generated (bundles, vendored
+// blobs) — scanning them wastes memory for no signal.
+export const TODO_SCAN_MAX_BYTES = 1024 * 1024;
+
 export const TODO_SCAN_EXTENSIONS = new Set([
   '.js', '.jsx', '.ts', '.tsx', '.py', '.go', '.rs', '.java', '.kt', '.cs',
   '.rb', '.php', '.sh', '.c', '.cpp', '.h', '.hpp', '.swift'

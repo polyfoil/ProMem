@@ -161,7 +161,7 @@ Format:
 
 #### Agent Entrypoints (Consent-Based Merge)
 - Check for existing `.cursorrules`, `CLAUDE.md`, and `AGENTS.md` files in the project root.
-- If they do not exist, create them (excluding `AGENTS.md`) with the mandatory ProMem operating rules (e.g. read Brief and Cerebrum, log handoffs to Memory).
+- If they do not exist, create all three with the mandatory ProMem operating rules (e.g. read Brief and Cerebrum, log handoffs to Memory). `AGENTS.md` is the emerging cross-agent standard; `.cursorrules` is kept for Cursor backward compatibility.
 - If they DO exist, DO NOT modify them without consent — these are user-maintained files. Ask the user for approval first; upon approval, PREPEND the ProMem mandatory rules to the very top of the file, preserving all existing content. Never overwrite.
 - Note: the `pm init` CLI deliberately never touches existing entrypoint files — merging into them is this skill's (consent-gated) responsibility.
 

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { TODO_SCAN_EXTENSIONS, COMMENT_MARKERS } from './constants.js';
+import { TODO_SCAN_EXTENSIONS, COMMENT_MARKERS, TODO_SCAN_MAX_BYTES } from './constants.js';
 import { getRelativePath } from './fileops.js';
 
 export function scanForTodos(fileList, rootPath) {
@@ -11,6 +11,7 @@ export function scanForTodos(fileList, rootPath) {
     if (!TODO_SCAN_EXTENSIONS.has(path.extname(file))) continue;
 
     try {
+      if (fs.statSync(file).size > TODO_SCAN_MAX_BYTES) continue;
       const content = fs.readFileSync(file, 'utf8');
       const lines = content.split('\n');
       for (let i = 0; i < lines.length; i++) {

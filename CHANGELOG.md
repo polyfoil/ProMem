@@ -3,6 +3,24 @@
 All notable changes to ProMem are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [1.3.0] — 2026-07-10
+
+### Added
+- `pm init` now also generates `AGENTS.md` when absent — the emerging
+  cross-agent standard entrypoint (`.cursorrules` kept for compatibility).
+- Unit tests for stale-lock recovery (dead-PID takeover, age-based takeover).
+- pm-memory skill rule: a change that resolves a Buglog item must close it in
+  the same session, citing the fixing TX id.
+
+### Changed
+- `runLink` refactored under the 50-line function rule (per-agent linking
+  extracted to a helper); `link.js` is documented as the canonical agent-root
+  registry, mirrored by the README table.
+- TODO scanner skips files larger than 1 MB (generated bundles carry no signal).
+- Ledger TX sequencing scans only the newest archive file (falls back to older
+  ones only when it yields no ids) instead of rescanning the whole archive on
+  every write.
+
 ## [1.2.1] — 2026-07-09
 
 ### Fixed

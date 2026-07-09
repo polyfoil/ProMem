@@ -5,6 +5,7 @@ import { ROOT_DIR } from '../utils/constants.js';
 
 // Known agent skill roots, relative to the user's home directory. An agent is
 // considered "installed" when its base directory (the first segment) exists.
+// This list is canonical — the README table mirrors it (see Cerebrum rule).
 const AGENT_ROOTS = [
   { agent: 'Claude Code', segments: ['.claude', 'skills'] },
   { agent: 'Codex', segments: ['.codex', 'skills'] },
@@ -17,6 +18,47 @@ const AGENT_ROOTS = [
 function createLink(targetDir, linkPath) {
   const type = process.platform === 'win32' ? 'junction' : 'dir';
   fs.symlinkSync(targetDir, linkPath, type);
+}
+
+// Links die with their target: warn when this installation is a git
+// worktree (a .git file), which is typically a temporary checkout.
+function warnIfEphemeralSource() {
+  try {
+    if (fs.statSync(path.join(ROOT_DIR, '.git')).isFile()) {
+      console.warn('Warning: this ProMem installation is a git worktree — links will break when the worktree is removed.');
+      console.warn('Prefer running "pm link" from your permanent clone.\n');
+    }
+  } catch (err) {
+    // No .git at all (e.g. npm-packaged install) — nothing to warn about.
+  }
+}
+
+function linkSkillsIntoRoot(skillRoot, skillsSrc, skillDirs) {
+  fs.mkdirSync(skillRoot, { recursive: true });
+  let created = 0;
+  let kept = 0;
+  for (const skill of skillDirs) {
+    const linkPath = path.join(skillRoot, skill);
+    // Non-destructive: never touch an existing entry (link, dir, or file).
+    let exists = false;
+    try {
+      fs.lstatSync(linkPath);
+      exists = true;
+    } catch (err) {
+      exists = false;
+    }
+    if (exists) {
+      kept++;
+      continue;
+    }
+    try {
+      createLink(path.join(skillsSrc, skill), linkPath);
+      created++;
+    } catch (err) {
+      console.warn(`  Warning: could not link ${skill} into ${skillRoot}: ${err.message}`);
+    }
+  }
+  return { created, kept };
 }
 
 export function runLink() {
@@ -38,54 +80,18 @@ export function runLink() {
     process.exit(1);
   }
 
-  // Links die with their target: warn when this installation is a git
-  // worktree (a .git file), which is typically a temporary checkout.
-  try {
-    if (fs.statSync(path.join(ROOT_DIR, '.git')).isFile()) {
-      console.warn('Warning: this ProMem installation is a git worktree — links will break when the worktree is removed.');
-      console.warn('Prefer running "pm link" from your permanent clone.\n');
-    }
-  } catch (err) {
-    // No .git at all (e.g. npm-packaged install) — nothing to warn about.
-  }
-
+  warnIfEphemeralSource();
   console.log(`Linking ProMem skills from: ${skillsSrc}\n`);
 
   let agentsFound = 0;
   for (const { agent, segments } of AGENT_ROOTS) {
-    const agentBase = path.join(home, segments[0]);
-    if (!fs.existsSync(agentBase)) {
+    if (!fs.existsSync(path.join(home, segments[0]))) {
       console.log(`${agent}: not detected (${segments[0]} missing) — skipped`);
       continue;
     }
     agentsFound++;
-
     const skillRoot = path.join(home, ...segments);
-    fs.mkdirSync(skillRoot, { recursive: true });
-
-    let created = 0;
-    let kept = 0;
-    for (const skill of skillDirs) {
-      const linkPath = path.join(skillRoot, skill);
-      // Non-destructive: never touch an existing entry (link, dir, or file).
-      let exists = false;
-      try {
-        fs.lstatSync(linkPath);
-        exists = true;
-      } catch (err) {
-        exists = false;
-      }
-      if (exists) {
-        kept++;
-        continue;
-      }
-      try {
-        createLink(path.join(skillsSrc, skill), linkPath);
-        created++;
-      } catch (err) {
-        console.warn(`  Warning: could not link ${skill} into ${skillRoot}: ${err.message}`);
-      }
-    }
+    const { created, kept } = linkSkillsIntoRoot(skillRoot, skillsSrc, skillDirs);
     console.log(`${agent}: ${created} linked, ${kept} already present (${skillRoot})`);
   }
 

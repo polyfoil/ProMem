@@ -76,8 +76,7 @@ function writeEntrypoints(projectRoot) {
     const filePath = path.join(projectRoot, rule.file);
     if (fs.existsSync(filePath)) {
       console.log(`Found existing ${rule.file} — left untouched. Ask your AI agent to merge the ProMem operating rules into it (pm-init skill).`);
-    } else if (rule.file !== 'AGENTS.md') {
-      // AGENTS.md is only relevant when the user already maintains one.
+    } else {
       fs.writeFileSync(filePath, rule.content);
       console.log(`Generated ${rule.file} in project root`);
     }

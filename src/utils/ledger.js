@@ -37,7 +37,9 @@ export function nextTxNumber(pmDir) {
   const archiveDir = path.join(pmDir, 'Archive');
   let archiveFiles = [];
   try {
-    archiveFiles = fs.readdirSync(archiveDir).filter(f => f.endsWith('.md'));
+    // Date-prefixed names sort chronologically; the newest archive holds the
+    // highest ids, so one file usually suffices.
+    archiveFiles = fs.readdirSync(archiveDir).filter(f => f.endsWith('.md')).sort().reverse();
   } catch (err) {
     // No archive yet.
   }
@@ -47,6 +49,8 @@ export function nextTxNumber(pmDir) {
     } catch (err) {
       console.warn(`Warning: could not scan archive file ${file} for TX ids: ${err.message}`);
     }
+    // Stop at the first archive that yields ids; older ones can't hold higher.
+    if (max > 0) break;
   }
 
   return max + 1;
