@@ -30,7 +30,9 @@ export function runCompact() {
     if (fs.existsSync(archiveFile)) {
       console.warn(`[WARNING] A compaction is already pending at: ${archiveRelPath}`);
       console.warn('Ask your AI agent to summarize and finalize it (pm-compact skill) before starting a new compaction.');
-      return;
+      // Exit 2 so scripts and agents can tell "refused" apart from "staged".
+      releaseLock(lockFile);
+      process.exit(2);
     }
 
     // Move current memory to archive as pending

@@ -11,10 +11,20 @@ function isDirectory(p) {
   }
 }
 
+// A directory only counts as a brain when it actually contains ProMem layer
+// structure. Name alone is not enough: a folder that merely happens to be
+// called "ProMem" (e.g. a clone of this very repository) must never be
+// mistaken for — and mutated as — a project brain.
+const BRAIN_MARKER_DIRS = ['04_Execution', '01_Foundations'];
+
+function looksLikeBrain(candidate) {
+  return BRAIN_MARKER_DIRS.some(marker => isDirectory(path.join(candidate, marker)));
+}
+
 function findPmDirIn(dir) {
   for (const name of PM_DIR_NAMES) {
     const candidate = path.join(dir, name);
-    if (isDirectory(candidate)) return candidate;
+    if (isDirectory(candidate) && looksLikeBrain(candidate)) return candidate;
   }
   return null;
 }
@@ -59,6 +69,18 @@ export function resolveGitCommonDir(projectRoot) {
   const idx = normalized.lastIndexOf('/worktrees/');
   if (idx !== -1) return gitdir.slice(0, idx);
   return null;
+}
+
+// Walks up from startDir to the nearest directory containing a .git entry.
+// Returns null when the path is not inside a git repository.
+export function findGitRoot(startDir = process.cwd()) {
+  let dir = path.resolve(startDir);
+  while (true) {
+    if (fs.existsSync(path.join(dir, '.git'))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
 }
 
 // Locates the project's memory ("one brain per project"):

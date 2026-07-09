@@ -38,6 +38,17 @@ export function runLink() {
     process.exit(1);
   }
 
+  // Links die with their target: warn when this installation is a git
+  // worktree (a .git file), which is typically a temporary checkout.
+  try {
+    if (fs.statSync(path.join(ROOT_DIR, '.git')).isFile()) {
+      console.warn('Warning: this ProMem installation is a git worktree — links will break when the worktree is removed.');
+      console.warn('Prefer running "pm link" from your permanent clone.\n');
+    }
+  } catch (err) {
+    // No .git at all (e.g. npm-packaged install) — nothing to warn about.
+  }
+
   console.log(`Linking ProMem skills from: ${skillsSrc}\n`);
 
   let agentsFound = 0;

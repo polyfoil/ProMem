@@ -57,6 +57,22 @@ export function runStatus() {
     }
   }
 
+  // Core layer files cannot be regenerated without a project scan — report
+  // them so the user/agent knows to consult the pm-init skill, don't fabricate.
+  const coreFiles = [
+    '01_Foundations/Brief.md',
+    '03_Specifications/Architecture.md',
+    '04_Execution/Anatomy.md',
+    '04_Execution/Cerebrum.md',
+    '04_Execution/Buglog.md'
+  ];
+  for (const relPath of coreFiles) {
+    if (!fs.existsSync(path.join(pmDir, ...relPath.split('/')))) {
+      issuesFound++;
+      console.warn(`[WARNING] Missing ${relPath} — cannot auto-create (needs project knowledge). Ask your AI agent to restore it (pm-init skill).`);
+    }
+  }
+
   // Surface any pending compaction so the agent knows to finish it
   const archiveDir = path.join(pmDir, 'Archive');
   let pendingFiles = [];

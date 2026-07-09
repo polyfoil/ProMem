@@ -39,7 +39,11 @@ Commands:
         let agent = 'Developer';
         let msgArgs = [];
         for (let i = 1; i < args.length; i++) {
-          if ((args[i] === '--agent' || args[i] === '-a') && args[i + 1]) {
+          if (args[i] === '--agent' || args[i] === '-a') {
+            if (!args[i + 1]) {
+              console.error(`Error: ${args[i]} requires a value (the agent name).`);
+              process.exit(1);
+            }
             agent = args[i + 1];
             i++;
           } else {

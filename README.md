@@ -1,5 +1,7 @@
 # ProMem — Project Memory Framework
 
+[![tests](https://github.com/polyfoil/ProMem/actions/workflows/test.yml/badge.svg)](https://github.com/polyfoil/ProMem/actions/workflows/test.yml)
+
 > **Memory belongs to the project, not the agent.**
 
 ProMem is a holistic memory harness for software projects. It gives any AI agent — Claude, Cursor, Copilot, Codex, or any future model — instant, complete understanding of your project by maintaining a structured, persistent Second Brain alongside your code.

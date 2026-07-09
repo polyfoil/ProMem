@@ -126,6 +126,10 @@ a new ProMem directory, follow the user's preference or default to `.pm/`.
 
 **One brain per project.** The `pm` CLI resolves the brain automatically:
 
+0. A candidate directory only counts as a brain when it contains ProMem
+   layer structure (`04_Execution/` or `01_Foundations/`). A folder that
+   merely happens to be named `ProMem` — such as a clone of the ProMem
+   repository itself — is never treated as a brain.
 1. It walks up from the current directory, so commands work from any
    subdirectory of the project.
 2. Resolution stops at the repository boundary (`.git`) — a brain never
@@ -136,3 +140,5 @@ a new ProMem directory, follow the user's preference or default to `.pm/`.
 4. `pm init` refuses to create a second brain when one is already
    resolvable — this prevents split-brain between worktrees or nested
    directories.
+5. `pm init` also refuses to run from a subdirectory of a git repository:
+   the brain belongs at the repository root, where resolution can find it.

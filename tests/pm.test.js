@@ -94,16 +94,19 @@ test('ProMem CLI Integration Tests', async (t) => {
     assert.ok(archived.includes(manualNote), 'Manual non-entry notes must be preserved in the pending archive');
   });
 
-  await t.test('pm compact should refuse to run while a compaction is already pending', () => {
+  await t.test('pm compact should refuse (exit 2) while a compaction is already pending', () => {
     const memoryBefore = fs.readFileSync(memoryPath, 'utf8');
 
-    runCompact();
+    const result = spawnSync('node', [PM_JS_PATH, 'compact'], { cwd: testProjectDir });
+    assert.strictEqual(result.status, 2, 'A refused compaction must exit with code 2 so agents can detect it');
 
     const memoryAfter = fs.readFileSync(memoryPath, 'utf8');
     assert.strictEqual(memoryAfter, memoryBefore, 'Memory.md must not change while a compaction is pending');
 
     const pendingFiles = fs.readdirSync(archiveDir).filter(f => f.endsWith('_Memory_Pending.md'));
     assert.strictEqual(pendingFiles.length, 1, 'No second pending archive may be created');
+
+    assert.ok(!fs.existsSync(path.join(testProjectDir, '.pm', '.pm.lock')), 'The lock must be released after a refused compaction');
   });
 
   await t.test('TX numbering stays monotonic across compactions (archive is scanned)', () => {
@@ -271,6 +274,57 @@ test('brain resolution: worktrees, subdirectories, split-brain guard', async (t)
   });
 
   cleanup(base);
+});
+
+test('brain detection requires layer markers, not just a directory name', async (t) => {
+  const base = freshDir('temp-decoy-fixture');
+  // A folder that merely happens to be named ProMem (like a clone of this repo)
+  const decoy = path.join(base, 'home', 'ProMem');
+  fs.mkdirSync(path.join(decoy, 'skills'), { recursive: true });
+  fs.writeFileSync(path.join(decoy, 'README.md'), '# just a clone\n');
+  const workDir = path.join(base, 'home', 'workdir');
+  fs.mkdirSync(workDir, { recursive: true });
+
+  await t.test('a plain folder named ProMem is never treated (or mutated) as a brain', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'status'], { cwd: workDir });
+    assert.notStrictEqual(result.status, 0, 'status must report "no brain found" instead of adopting the decoy');
+    assert.ok(!fs.existsSync(path.join(decoy, '04_Execution')), 'The decoy directory must not be mutated');
+    assert.ok(!fs.existsSync(path.join(decoy, '01_Foundations')), 'No layer directories may be created inside the decoy');
+  });
+
+  await t.test('a real brain named ProMem (with layer markers) still resolves', () => {
+    const brainProject = path.join(base, 'brainproj');
+    fs.mkdirSync(path.join(brainProject, 'ProMem', '04_Execution'), { recursive: true });
+    fs.writeFileSync(path.join(brainProject, 'ProMem', '04_Execution', 'Memory.md'), '# Memory — Shift Ledger\n');
+
+    const result = spawnSync('node', [PM_JS_PATH, 'memory', 'promem-dir entry', '-a', 'NamedBrainAgent'], { cwd: brainProject });
+    assert.strictEqual(result.status, 0, 'A ProMem/ directory with real layer structure must still work');
+    const memory = fs.readFileSync(path.join(brainProject, 'ProMem', '04_Execution', 'Memory.md'), 'utf8');
+    assert.match(memory, /Agent: NamedBrainAgent\]: promem-dir entry/);
+  });
+
+  cleanup(base);
+});
+
+test('pm init refuses to plant a brain in a git repo subdirectory', async (t) => {
+  const repoDir = freshDir('temp-subdir-init');
+  const subDir = path.join(repoDir, 'deep', 'sub');
+  fs.mkdirSync(subDir, { recursive: true });
+
+  await t.test('init from a subdirectory aborts with guidance and creates nothing', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'init'], { cwd: subDir });
+    assert.notStrictEqual(result.status, 0, 'init must refuse below the repository root');
+    assert.ok(result.stderr.toString().includes('repository root'), 'The error must point the user to the repository root');
+    assert.ok(!fs.existsSync(path.join(subDir, '.pm')), 'No brain may be created in the subdirectory');
+  });
+
+  await t.test('init at the repository root still works', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'init'], { cwd: repoDir });
+    assert.strictEqual(result.status, 0, 'init must succeed at the repository root');
+    assert.ok(fs.existsSync(path.join(repoDir, '.pm', '04_Execution', 'Memory.md')));
+  });
+
+  cleanup(repoDir);
 });
 
 test('pm link wires skills into detected agent roots (isolated fake home)', async (t) => {
