@@ -6,6 +6,7 @@ import { runMemory } from './commands/memory.js';
 import { runCompact } from './commands/compact.js';
 import { runStatus } from './commands/status.js';
 import { runHook } from './commands/hook.js';
+import { runLink } from './commands/link.js';
 
 export function runCli(args) {
   const command = args[0];
@@ -21,6 +22,7 @@ Commands:
   compact        Archive completed entries and compress Memory.md
   status         Run health checks on .pm directory and auto-fix issues
   hook           Install a git post-commit hook for automatic updates
+  link           Link the ProMem skills into every AI agent installed on this machine
 `);
     process.exit(0);
   }
@@ -56,6 +58,9 @@ Commands:
         break;
       case 'hook':
         runHook();
+        break;
+      case 'link':
+        runLink();
         break;
       default:
         console.error(`Unknown command: ${command}`);

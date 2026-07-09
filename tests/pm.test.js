@@ -273,6 +273,42 @@ test('brain resolution: worktrees, subdirectories, split-brain guard', async (t)
   cleanup(base);
 });
 
+test('pm link wires skills into detected agent roots (isolated fake home)', async (t) => {
+  const fakeHome = freshDir('temp-link-home');
+  // Two "installed" agents; the others are absent and must be skipped.
+  fs.mkdirSync(path.join(fakeHome, '.claude'), { recursive: true });
+  fs.mkdirSync(path.join(fakeHome, '.gemini'), { recursive: true });
+  const env = { ...process.env, PROMEM_HOME: fakeHome };
+
+  await t.test('links pm-* skills into detected agents only, no admin required', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'link'], { env });
+    assert.strictEqual(result.status, 0, 'pm link should succeed');
+    const out = result.stdout.toString();
+
+    const claudeLink = path.join(fakeHome, '.claude', 'skills', 'pm-memory');
+    const geminiLink = path.join(fakeHome, '.gemini', 'config', 'skills', 'pm-memory');
+    assert.ok(fs.lstatSync(claudeLink).isSymbolicLink() || fs.statSync(claudeLink).isDirectory(), 'Claude root should receive a link');
+    assert.ok(fs.existsSync(path.join(geminiLink, 'SKILL.md')), 'Gemini/Antigravity link must resolve to the real skill');
+    assert.ok(!fs.existsSync(path.join(fakeHome, '.codex')), 'Undetected agents must not be created');
+    assert.ok(out.includes('not detected'), 'Missing agents should be reported as skipped');
+  });
+
+  await t.test('is idempotent and never touches existing entries', () => {
+    // Replace one link with a real file simulating a user-managed entry.
+    const userManaged = path.join(fakeHome, '.claude', 'skills', 'pm-query');
+    fs.rmSync(userManaged, { recursive: true, force: true });
+    fs.mkdirSync(userManaged);
+    fs.writeFileSync(path.join(userManaged, 'SKILL.md'), 'USER CONTENT\n');
+
+    const result = spawnSync('node', [PM_JS_PATH, 'link'], { env });
+    assert.strictEqual(result.status, 0, 'second pm link run should succeed');
+    assert.strictEqual(fs.readFileSync(path.join(userManaged, 'SKILL.md'), 'utf8'), 'USER CONTENT\n', 'User-managed entries must never be overwritten');
+    assert.ok(result.stdout.toString().includes('already present'), 'Existing entries should be reported as kept');
+  });
+
+  cleanup(fakeHome);
+});
+
 test('TODO scanner precision', async (t) => {
   const originalCwd = process.cwd();
   const scanProjectDir = freshDir('temp-scan-project');

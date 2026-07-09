@@ -70,39 +70,37 @@ npm link
 *Now the `pm` command is available system-wide.*
 
 ### 2. Centralized Skills Hub (For AI Agents)
-Instead of copying skill files into every single agent's configuration folder, point all your agents (Claude, Codex, Gemini, Antigravity, etc.) to your central ProMem installation. When you pull an update to ProMem, all your agents instantly get the new skills.
+Your clone is the **single source of truth**. Instead of copying skill files into every agent's configuration folder, link them once:
 
-**For Gemini / Antigravity / GStack:**
-Antigravity discovers skills from the `~/.gemini/config/skills/` directory (the IDE reaches it through the `~/.gemini/antigravity/skills` symlink). Symlink the ProMem skills into it:
-
-*macOS / Linux:*
 ```bash
-ln -s ~/ProMem/skills/pm-* ~/.gemini/config/skills/
+pm link
 ```
 
-*Windows (PowerShell — requires Developer Mode, or run the shell as administrator):*
+`pm link` detects the AI agents installed on your machine and links the `pm-*` skills into each one's skill directory. It is **non-destructive** (existing entries are never touched) and needs **no admin rights** (directory junctions on Windows, symlinks on macOS/Linux).
+
+| Agent | Skills directory |
+|-------|------------------|
+| Claude Code | `~/.claude/skills/` |
+| Codex | `~/.codex/skills/` |
+| Gemini / Antigravity | `~/.gemini/config/skills/` |
+| Cursor | `~/.cursor/skills/` |
+| Generic (AGENTS.md tooling) | `~/.agents/skills/` |
+
+Because these are links — not copies — a single `git pull` in your clone updates every agent on your machine instantly.
+
+**Prefer manual control?** Point your agent's skills directory at the folders under `<your-clone>/skills/` yourself, e.g.:
+
+```bash
+ln -s ~/ProMem/skills/pm-* ~/.claude/skills/        # macOS / Linux
+```
 ```powershell
+# Windows — junctions work without admin rights:
 Get-ChildItem "$env:USERPROFILE\ProMem\skills" -Directory | ForEach-Object {
-  New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.gemini\config\skills\$($_.Name)" -Target $_.FullName
+  New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\skills\$($_.Name)" -Target $_.FullName
 }
 ```
 
-Symlinks (not copies) keep every agent on the single source of truth: pull an update once, and all agents see it immediately.
-
-**For Claude Code / Cursor / Codex:**
-Symlink the skills folder centrally:
-
-*macOS / Linux:*
-```bash
-ln -s ~/ProMem/skills/pm-* ~/.claude/skills/
-```
-
-*Windows (PowerShell — requires Developer Mode, or run the shell as administrator):*
-```powershell
-Get-ChildItem "$env:USERPROFILE\ProMem\skills" -Directory | ForEach-Object {
-  New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\skills\$($_.Name)" -Target $_.FullName
-}
-```
+> **Good to know:** links point at your clone's location on disk. If you move or delete the clone, the links go dark — re-clone (or move) and run `pm link` again to refresh them. If your agent's skills directory lives somewhere unusual, set it up manually as above; `pm link` only manages the well-known locations in the table.
 
 ### 3. Initialize on your project
 Navigate to any project directory where you want to build a persistent memory. You can initialize it using either your AI agent or the built-in CLI tool:

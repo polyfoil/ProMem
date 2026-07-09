@@ -11,6 +11,7 @@ export { runMemory } from './src/commands/memory.js';
 export { runCompact } from './src/commands/compact.js';
 export { runStatus } from './src/commands/status.js';
 export { runHook } from './src/commands/hook.js';
+export { runLink } from './src/commands/link.js';
 export { detectTechStack } from './src/utils/detectors.js';
 export { scanForTodos } from './src/utils/scanner.js';
 export { loadTemplate } from './src/utils/fileops.js';
