@@ -25,39 +25,46 @@ Commands:
     process.exit(0);
   }
 
-  switch (command) {
-    case 'init':
-      runInit();
-      break;
-    case 'update':
-      runUpdate();
-      break;
-    case 'memory': {
-      let agent = 'Developer';
-      let msgArgs = [];
-      for (let i = 1; i < args.length; i++) {
-        if ((args[i] === '--agent' || args[i] === '-a') && args[i + 1]) {
-          agent = args[i + 1];
-          i++;
-        } else {
-          msgArgs.push(args[i]);
+  try {
+    switch (command) {
+      case 'init':
+        runInit();
+        break;
+      case 'update':
+        runUpdate();
+        break;
+      case 'memory': {
+        let agent = 'Developer';
+        let msgArgs = [];
+        for (let i = 1; i < args.length; i++) {
+          if ((args[i] === '--agent' || args[i] === '-a') && args[i + 1]) {
+            agent = args[i + 1];
+            i++;
+          } else {
+            msgArgs.push(args[i]);
+          }
         }
+        const msg = msgArgs.join(' ') || 'Manual update';
+        runMemory(msg, agent);
+        break;
       }
-      const msg = msgArgs.join(' ') || 'Manual update';
-      runMemory(msg, agent);
-      break;
+      case 'compact':
+        runCompact();
+        break;
+      case 'status':
+        runStatus();
+        break;
+      case 'hook':
+        runHook();
+        break;
+      default:
+        console.error(`Unknown command: ${command}`);
+        process.exit(1);
     }
-    case 'compact':
-      runCompact();
-      break;
-    case 'status':
-      runStatus();
-      break;
-    case 'hook':
-      runHook();
-      break;
-    default:
-      console.error(`Unknown command: ${command}`);
-      process.exit(1);
+  } catch (err) {
+    // Commands handle their own expected failures; anything reaching here is
+    // unexpected — show a concise message instead of a raw stack trace.
+    console.error(`Error: ${err.message}`);
+    process.exit(1);
   }
 }

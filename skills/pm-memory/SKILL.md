@@ -30,14 +30,29 @@ Immediately after completing a code change, resolving a bug, or finishing a task
 
 1. Run the `pm memory` CLI tool from the command line:
    `pm memory "<Detailed description of what you just completed and the file path impacted>" -a <Your_Name>`
-2. This will append a formatted transaction line to `.pm/04_Execution/Memory.md`:
-   `- [YYYY-MM-DD HH:MM | Agent: <agent_name>]: <description>`
+2. This will append a formatted transaction line with a sequential transaction ID to `.pm/04_Execution/Memory.md`:
+   `- [TX-0042 | YYYY-MM-DD HH:MM | Agent: <agent_name>]: <description>`
 
 ### Writing Rules
 
 - **Be specific and include paths:** Write e.g., `Implemented JWT token rotation in src/auth/jwt.ts` instead of `Updated auth`.
-- **Keep it to one line:** The `pm memory` tool automatically structures it as a single markdown list item.
+- **Keep it to one line:** The `pm memory` tool automatically structures it as a single markdown list item (newlines in the message are flattened to spaces).
 - **Log every milestone:** A typical session should have 2-5 ledger entries documenting the incremental progress.
+
+### Cross-Linking Knowledge (TX ids)
+
+Every ledger entry carries a transaction ID (`TX-0042`). Use these IDs to
+relate knowledge across the ProMem documents — they form a lightweight,
+greppable relation graph:
+
+- Cerebrum rules cite their origin: `**Source:** TX-0042`
+- Buglog issues reference the fixing transaction: `Fixed in TX-0058`
+- ADR entries cite the transaction where the decision was made.
+- A memory entry may reference a Buglog issue it addressed: `Resolved ISSUE-003`.
+
+IDs are assigned by the CLI and stay monotonic across compactions (the
+counter is derived from Memory.md plus the Archive). Never invent or reuse
+a TX id manually.
 
 
 ---

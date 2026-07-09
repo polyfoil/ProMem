@@ -26,9 +26,10 @@ function detectPython(projectRoot) {
 
   const pyprojPath = path.join(projectRoot, 'pyproject.toml');
   if (fs.existsSync(pyprojPath)) {
-    entries.push({ layer: 'Core', technology: 'Python', version: '>=3.10', purpose: 'Application runtime' });
     try {
       const content = fs.readFileSync(pyprojPath, 'utf8');
+      const versionMatch = content.match(/requires-python\s*=\s*["']([^"']+)["']/);
+      entries.push({ layer: 'Core', technology: 'Python', version: versionMatch ? versionMatch[1] : 'Unknown', purpose: 'Application runtime' });
       const depsMatch = content.match(/dependencies\s*=\s*\[([\s\S]*?)\]/);
       if (depsMatch) {
         const deps = depsMatch[1].split(',').map(d => d.trim().replace(/"/g, '').replace(/'/g, '')).filter(Boolean);
@@ -38,6 +39,7 @@ function detectPython(projectRoot) {
       }
     } catch (e) {
       console.warn(`Warning: Failed to parse pyproject.toml: ${e.message}`);
+      entries.push({ layer: 'Core', technology: 'Python', version: 'Unknown', purpose: 'Application runtime' });
     }
     return entries;
   }

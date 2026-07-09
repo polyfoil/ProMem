@@ -15,9 +15,31 @@ export function getRelativePath(absolutePath, rootPath) {
   return path.relative(rootPath, absolutePath).replace(/\\/g, '/');
 }
 
+// Best-effort .gitignore support: only simple, unambiguous entries are used —
+// plain names or single directory patterns ("docs/", "/dist"). Wildcards,
+// negations, and nested paths are left to the static IGNORE_DIRS list.
+function loadGitignoreNames(rootPath) {
+  const names = new Set();
+  let content;
+  try {
+    content = fs.readFileSync(path.join(rootPath, '.gitignore'), 'utf8');
+  } catch (err) {
+    return names;
+  }
+  for (const raw of content.split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#') || line.startsWith('!')) continue;
+    const stripped = line.replace(/^\//, '').replace(/\/$/, '');
+    if (!stripped || stripped.includes('/') || /[*?[\]]/.test(stripped)) continue;
+    names.add(stripped);
+  }
+  return names;
+}
+
 export function walkProject(dir, rootPath) {
   const fileList = [];
   const truncatedPaths = [];
+  const gitignoreNames = loadGitignoreNames(rootPath);
   let tree = '';
 
   function walk(currentDir, currentDepth, suppressTree) {
@@ -41,7 +63,7 @@ export function walkProject(dir, rootPath) {
 
     const indent = '  '.repeat(currentDepth);
     for (const entry of entries) {
-      if (IGNORE_DIRS.has(entry.name)) continue;
+      if (IGNORE_DIRS.has(entry.name) || gitignoreNames.has(entry.name)) continue;
       const res = path.resolve(currentDir, entry.name);
       const isHidden = entry.name.startsWith('.');
       const hideSubtree = suppressTree || isHidden;

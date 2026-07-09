@@ -15,29 +15,34 @@ export function runCompact() {
 
   const lockFile = acquireLock(pmDir);
   try {
+    // Self-heal: the archive directory may have been deleted manually.
+    fs.mkdirSync(archiveDir, { recursive: true });
+
     const today = new Date().toISOString().split('T')[0];
     const archiveFile = path.join(archiveDir, `${today}_Memory_Pending.md`);
-    
-    // Check if there is already a pending compaction
+    const archiveRelPath = `.pm/Archive/${today}_Memory_Pending.md`;
+
     if (fs.existsSync(archiveFile)) {
-      console.warn(`[WARNING] A compaction is already pending at: ${archiveFile}`);
-      console.warn(`Please ask your AI agent to read it and summarize it before starting a new compaction.`);
+      console.warn(`[WARNING] A compaction is already pending at: ${archiveRelPath}`);
+      console.warn('Ask your AI agent to summarize and finalize it (pm-compact skill) before starting a new compaction.');
       return;
     }
 
     // Move current memory to archive as pending
     fs.renameSync(memoryPath, archiveFile);
-    
-    // Create new blank memory with prompt for AI
+
+    // Create new blank memory with a directive for the AI agent
     const newMemoryContent = `# Memory — Shift Ledger
 
 > [!IMPORTANT]
-> Ajanınızdan \`${archiveFile}\` dosyasını okuyup, o dosyadaki tüm olayları özetleyerek buraya "The Story So Far" (Şu Ana Kadar Neler Oldu) paragrafını yazmasını isteyin.
+> A compaction is pending. Ask your AI agent to read \`${archiveRelPath}\`,
+> write a "The Story So Far" summary paragraph here, and finalize the archive
+> (see the pm-compact skill for the exact procedure).
 `;
     fs.writeFileSync(memoryPath, newMemoryContent);
 
-    console.log(`✅ Memory staged for compaction at: Archive/${today}_Memory_Pending.md`);
-    console.log(`🤖 Action Required: Ask your AI agent to run 'pm compact' to summarize the pending file.`);
+    console.log(`Memory staged for compaction at: ${archiveRelPath}`);
+    console.log(`Action required: ask your AI agent to summarize the pending file (pm-compact skill).`);
   } finally {
     releaseLock(lockFile);
   }

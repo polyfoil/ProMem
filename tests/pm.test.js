@@ -10,15 +10,26 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PM_JS_PATH = path.join(__dirname, '..', 'pm.js');
 
+function freshDir(name) {
+  const dir = path.join(__dirname, name);
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function cleanup(dir) {
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 test('ProMem CLI Integration Tests', async (t) => {
   const originalCwd = process.cwd();
-  const testProjectDir = path.join(__dirname, 'temp-test-project');
-
-  // Setup temporary test project directory
-  if (fs.existsSync(testProjectDir)) {
-    fs.rmSync(testProjectDir, { recursive: true, force: true });
-  }
-  fs.mkdirSync(testProjectDir, { recursive: true });
+  const testProjectDir = freshDir('temp-test-project');
+  const memoryPath = path.join(testProjectDir, '.pm', '04_Execution', 'Memory.md');
+  const archiveDir = path.join(testProjectDir, '.pm', 'Archive');
 
   // Switch directory context for pm.js execution
   process.chdir(testProjectDir);
@@ -35,84 +46,182 @@ test('ProMem CLI Integration Tests', async (t) => {
     assert.ok(fs.existsSync(path.join(pmDir, '04_Execution', 'Buglog.md')), 'Buglog.md should exist');
     assert.ok(fs.existsSync(path.join(testProjectDir, '.cursorrules')), '.cursorrules should be generated at root');
     assert.ok(fs.existsSync(path.join(testProjectDir, 'CLAUDE.md')), 'CLAUDE.md should be generated at root');
+
+    const memoryContent = fs.readFileSync(memoryPath, 'utf8');
+    assert.match(memoryContent, /- \[TX-0001 \| .* \| Agent: pm-cli\]:/, 'Init entry should carry the first transaction id');
   });
 
-  await t.test('pm memory should append a new formatted handoff entry to Memory.md', () => {
+  await t.test('pm memory should append a TX-numbered handoff entry to Memory.md', () => {
     runMemory('Test feature addition', 'TestAgent');
 
-    const memoryContent = fs.readFileSync(path.join(testProjectDir, '.pm', '04_Execution', 'Memory.md'), 'utf8');
-    assert.match(memoryContent, /- \[.* \| Agent: TestAgent\]: Test feature addition/, 'Memory entry should match transaction format');
+    const memoryContent = fs.readFileSync(memoryPath, 'utf8');
+    assert.match(memoryContent, /- \[TX-0002 \| .* \| Agent: TestAgent\]: Test feature addition/, 'Memory entry should match the TX transaction format');
   });
 
-  await t.test('pm compact should move older entries to Archive and keep ledger clean', () => {
-    // Append additional entries to trigger compaction (needs > 10 entries, currently have 2: init + 1st memory)
+  await t.test('pm memory should flatten multi-line messages into a single ledger line', () => {
+    runMemory('first line\nsecond line', 'TestAgent');
+
+    const memoryContent = fs.readFileSync(memoryPath, 'utf8');
+    assert.ok(memoryContent.includes('first line second line'), 'Newlines in the message should be flattened to spaces');
+    assert.ok(!memoryContent.includes('first line\nsecond line'), 'The raw multi-line message must not reach the ledger');
+  });
+
+  await t.test('pm compact should stage the full ledger into a pending archive and reset Memory.md', () => {
+    const manualNote = 'NOTE: production deploy is frozen until Friday.';
+    fs.appendFileSync(memoryPath, `\n${manualNote}\n`);
+
     for (let i = 1; i <= 10; i++) {
       runMemory(`Task ${i} completed`, 'TestAgent');
     }
 
     runCompact();
 
-    const memoryContent = fs.readFileSync(path.join(testProjectDir, '.pm', '04_Execution', 'Memory.md'), 'utf8');
-    const lines = memoryContent.split('\n').map(l => l.trim()).filter(Boolean);
-    const entries = lines.filter(line => line.startsWith('- ['));
+    const memoryContent = fs.readFileSync(memoryPath, 'utf8');
+    const entries = memoryContent.split('\n').filter(l => l.trim().startsWith('- ['));
+    assert.strictEqual(entries.length, 0, 'The reset Memory.md should contain no transaction entries');
+    assert.ok(memoryContent.includes('compaction is pending'), 'The reset Memory.md should carry the agent directive');
+    assert.ok(memoryContent.includes('pm-compact skill'), 'The directive should point the agent to the pm-compact skill');
 
-    // Memory.md should retain only the last 10 entries
-    assert.strictEqual(entries.length, 10, 'Memory.md should only keep the 10 active entries');
+    const pendingFiles = fs.readdirSync(archiveDir).filter(f => f.endsWith('_Memory_Pending.md'));
+    assert.strictEqual(pendingFiles.length, 1, 'Exactly one pending archive file should exist');
 
-    // Archive folder should have an archive file generated
-    const archiveFiles = fs.readdirSync(path.join(testProjectDir, '.pm', 'Archive')).filter(f => f.endsWith('.md'));
-    assert.strictEqual(archiveFiles.length, 1, 'An archive summary file should be generated in the Archive directory');
+    const archived = fs.readFileSync(path.join(archiveDir, pendingFiles[0]), 'utf8');
+    assert.ok(archived.includes('Task 1 completed'), 'All ledger entries must be preserved in the pending archive');
+    assert.ok(archived.includes('Test feature addition'), 'Earlier entries must be preserved in the pending archive');
+    assert.ok(archived.includes(manualNote), 'Manual non-entry notes must be preserved in the pending archive');
   });
 
-  await t.test('pm compact should preserve non-entry content instead of destroying it', () => {
-    const memoryPath = path.join(testProjectDir, '.pm', '04_Execution', 'Memory.md');
-    const manualNote = 'NOTE: production deploy is frozen until Friday.';
-    fs.appendFileSync(memoryPath, `\n${manualNote}\n`);
+  await t.test('pm compact should refuse to run while a compaction is already pending', () => {
+    const memoryBefore = fs.readFileSync(memoryPath, 'utf8');
 
-    for (let i = 11; i <= 21; i++) {
-      runMemory(`Task ${i} completed`, 'TestAgent');
-    }
     runCompact();
+
+    const memoryAfter = fs.readFileSync(memoryPath, 'utf8');
+    assert.strictEqual(memoryAfter, memoryBefore, 'Memory.md must not change while a compaction is pending');
+
+    const pendingFiles = fs.readdirSync(archiveDir).filter(f => f.endsWith('_Memory_Pending.md'));
+    assert.strictEqual(pendingFiles.length, 1, 'No second pending archive may be created');
+  });
+
+  await t.test('TX numbering stays monotonic across compactions (archive is scanned)', () => {
+    const pendingFile = fs.readdirSync(archiveDir).filter(f => f.endsWith('_Memory_Pending.md'))[0];
+    const archived = fs.readFileSync(path.join(archiveDir, pendingFile), 'utf8');
+    let maxTx = 0;
+    // Same line-anchored pattern the ledger uses: documentation examples
+    // (e.g. the format comment in the template header) must not count.
+    for (const match of archived.matchAll(/^\s*- \[TX-(\d+)/gm)) {
+      maxTx = Math.max(maxTx, Number(match[1]));
+    }
+    assert.ok(maxTx >= 12, 'Sanity: the archive should contain the earlier transactions');
+
+    runMemory('post-compact entry', 'TestAgent');
 
     const memoryContent = fs.readFileSync(memoryPath, 'utf8');
-    assert.ok(memoryContent.includes(manualNote), 'Manual non-entry notes must survive compaction');
-  });
-
-  await t.test('pm compact should append to the same-day archive, not overwrite it', () => {
-    const archiveDir = path.join(testProjectDir, '.pm', 'Archive');
-    const archiveFile = fs.readdirSync(archiveDir).filter(f => f.endsWith('.md'))[0];
-    const archiveBefore = fs.readFileSync(path.join(archiveDir, archiveFile), 'utf8');
-    const entriesBefore = archiveBefore.split('\n').filter(l => l.trim().startsWith('- [')).length;
-
-    for (let i = 22; i <= 32; i++) {
-      runMemory(`Task ${i} completed`, 'TestAgent');
-    }
-    runCompact();
-
-    const archiveFiles = fs.readdirSync(archiveDir).filter(f => f.endsWith('.md'));
-    assert.strictEqual(archiveFiles.length, 1, 'Same-day compaction should reuse the daily archive file');
-
-    const archiveAfter = fs.readFileSync(path.join(archiveDir, archiveFiles[0]), 'utf8');
-    const entriesAfter = archiveAfter.split('\n').filter(l => l.trim().startsWith('- [')).length;
-    assert.ok(entriesAfter > entriesBefore, 'Second compaction must append to the archive, not overwrite it');
-    assert.ok(archiveAfter.includes('Task 1 completed'), 'Entries from the first compaction must still be in the archive');
+    const expectedTx = `TX-${String(maxTx + 1).padStart(4, '0')}`;
+    assert.ok(memoryContent.includes(`[${expectedTx} `), `The next entry should continue the sequence (${expectedTx}), not restart at TX-0001`);
   });
 
   // Teardown and restore process directory context
   process.chdir(originalCwd);
-  if (fs.existsSync(testProjectDir)) {
-    fs.rmSync(testProjectDir, { recursive: true, force: true });
-  }
+  cleanup(testProjectDir);
+});
+
+test('pm init leaves existing entrypoint files untouched', async (t) => {
+  const projectDir = freshDir('temp-entrypoints-project');
+  const claudeMdPath = path.join(projectDir, 'CLAUDE.md');
+  const userRules = '# MY CUSTOM RULES\n\n- never touch this file\n';
+  fs.writeFileSync(claudeMdPath, userRules);
+
+  await t.test('existing CLAUDE.md is preserved byte-for-byte, missing .cursorrules is created', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0, 'pm init should succeed');
+
+    assert.strictEqual(fs.readFileSync(claudeMdPath, 'utf8'), userRules, 'Existing CLAUDE.md must not be modified');
+    assert.ok(result.stdout.toString().includes('left untouched'), 'The user should be told the file was left untouched');
+    assert.ok(fs.existsSync(path.join(projectDir, '.cursorrules')), 'Missing .cursorrules should still be generated');
+    assert.ok(!fs.existsSync(path.join(projectDir, 'AGENTS.md')), 'AGENTS.md should not be created when absent');
+  });
+
+  cleanup(projectDir);
+});
+
+test('project scanning respects simple .gitignore directory patterns', async (t) => {
+  const projectDir = freshDir('temp-gitignore-project');
+  fs.writeFileSync(path.join(projectDir, '.gitignore'), 'private/\n*.log\n# comment\n');
+  fs.mkdirSync(path.join(projectDir, 'private'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, 'private', 'secret.js'), 'export const key = 1;\n');
+  fs.mkdirSync(path.join(projectDir, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, 'src', 'app.js'), 'export const app = 1;\n');
+
+  await t.test('gitignored directories are excluded from the Anatomy index', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0, 'pm init should succeed');
+
+    const anatomy = fs.readFileSync(path.join(projectDir, '.pm', '04_Execution', 'Anatomy.md'), 'utf8');
+    assert.ok(!anatomy.includes('secret.js'), 'Files inside gitignored directories must not be indexed');
+    assert.ok(anatomy.includes('src/app.js'), 'Regular source files should still be indexed');
+  });
+
+  cleanup(projectDir);
+});
+
+test('pm status auto-repairs missing structure and reports pending compactions', async (t) => {
+  const projectDir = freshDir('temp-status-project');
+  spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
+
+  await t.test('missing Archive/ and Memory.md are recreated', () => {
+    fs.rmSync(path.join(projectDir, '.pm', 'Archive'), { recursive: true, force: true });
+    fs.rmSync(path.join(projectDir, '.pm', '04_Execution', 'Memory.md'), { force: true });
+
+    const result = spawnSync('node', [PM_JS_PATH, 'status'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0, 'pm status should succeed');
+    assert.ok(fs.existsSync(path.join(projectDir, '.pm', 'Archive')), 'Archive directory should be recreated');
+    const memory = fs.readFileSync(path.join(projectDir, '.pm', '04_Execution', 'Memory.md'), 'utf8');
+    assert.ok(memory.includes('# Memory — Shift Ledger'), 'Recovered Memory.md should carry the standard header');
+    assert.match(memory, /- \[TX-\d{4} \| .* \| Agent: pm-cli\]: Auto-recovered Memory.md/, 'Recovery entry should use the TX transaction format');
+  });
+
+  await t.test('a pending compaction file triggers a warning', () => {
+    fs.writeFileSync(path.join(projectDir, '.pm', 'Archive', '2026-01-01_Memory_Pending.md'), '# Memory — Shift Ledger\n');
+
+    const result = spawnSync('node', [PM_JS_PATH, 'status'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0, 'pm status should succeed');
+    assert.ok(result.stderr.toString().includes('Pending compaction found'), 'Status should surface the pending compaction to the agent');
+  });
+
+  cleanup(projectDir);
+});
+
+test('pm hook installs a post-commit hook with an absolute-path fallback', async (t) => {
+  const projectDir = freshDir('temp-hook-project');
+  const gitInit = spawnSync('git', ['init'], { cwd: projectDir });
+  assert.strictEqual(gitInit.status, 0, 'git init should succeed');
+
+  await t.test('the hook script embeds the ProMem installation path', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'hook'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0, 'pm hook should succeed');
+
+    const hookPath = path.join(projectDir, '.git', 'hooks', 'post-commit');
+    assert.ok(fs.existsSync(hookPath), 'post-commit hook should be created');
+
+    const content = fs.readFileSync(hookPath, 'utf8');
+    const expectedPmJs = PM_JS_PATH.replace(/\\/g, '/');
+    assert.ok(content.includes(`"${expectedPmJs}"`), 'The hook must embed the absolute pm.js path (forward slashes) as fallback');
+    assert.ok(content.includes('command -v pm'), 'The hook should prefer the globally linked pm command');
+  });
+
+  await t.test('running pm hook twice does not duplicate the hook', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'hook'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0);
+    assert.ok(result.stdout.toString().includes('already installed'), 'A second install should be detected and skipped');
+  });
+
+  cleanup(projectDir);
 });
 
 test('TODO scanner precision', async (t) => {
   const originalCwd = process.cwd();
-  const scanProjectDir = path.join(__dirname, 'temp-scan-project');
-
-  if (fs.existsSync(scanProjectDir)) {
-    fs.rmSync(scanProjectDir, { recursive: true, force: true });
-  }
-  fs.mkdirSync(scanProjectDir, { recursive: true });
+  const scanProjectDir = freshDir('temp-scan-project');
 
   // Comment TODO → should be reported
   fs.writeFileSync(path.join(scanProjectDir, 'app.js'), [
@@ -136,9 +245,7 @@ test('TODO scanner precision', async (t) => {
   });
 
   process.chdir(originalCwd);
-  if (fs.existsSync(scanProjectDir)) {
-    fs.rmSync(scanProjectDir, { recursive: true, force: true });
-  }
+  cleanup(scanProjectDir);
 });
 
 test('pm update (in-process) is a no-op when Architecture.md/Anatomy.md are absent', async (t) => {
@@ -156,14 +263,11 @@ test('pm update (in-process) is a no-op when Architecture.md/Anatomy.md are abse
   });
   process.chdir(originalCwd);
 
-  fs.rmSync(emptyPmProjectDir, { recursive: true, force: true });
+  cleanup(emptyPmProjectDir);
 });
 
 test('pm update (subprocess): errors cleanly without .pm/, refreshes after init', async (t) => {
-  const updateProjectDir = path.join(__dirname, 'temp-update-subprocess');
-  if (fs.existsSync(updateProjectDir)) {
-    fs.rmSync(updateProjectDir, { recursive: true, force: true });
-  }
+  const updateProjectDir = freshDir('temp-update-subprocess');
   fs.mkdirSync(path.join(updateProjectDir, 'src'), { recursive: true });
   fs.writeFileSync(path.join(updateProjectDir, 'package.json'), JSON.stringify({ name: 'update-fixture', engines: { node: '>=20' } }));
   fs.writeFileSync(path.join(updateProjectDir, 'src', 'index.js'), 'export const x = 1;\n');
@@ -200,17 +304,11 @@ test('pm update (subprocess): errors cleanly without .pm/, refreshes after init'
     assert.ok(anatomyAfter.includes('src/newfile.js'), 'Anatomy Key Files should include the new src/ file (Windows path-separator safe)');
   });
 
-  if (fs.existsSync(updateProjectDir)) {
-    fs.rmSync(updateProjectDir, { recursive: true, force: true });
-  }
+  cleanup(updateProjectDir);
 });
 
 test('detectTechStack recognizes non-Node ecosystems', async (t) => {
-  const fixtureRoot = path.join(__dirname, 'temp-stack-fixture');
-  if (fs.existsSync(fixtureRoot)) {
-    fs.rmSync(fixtureRoot, { recursive: true, force: true });
-  }
-  fs.mkdirSync(fixtureRoot, { recursive: true });
+  const fixtureRoot = freshDir('temp-stack-fixture');
 
   await t.test('Go: reads version from go.mod', () => {
     fs.writeFileSync(path.join(fixtureRoot, 'go.mod'), 'module example.com/app\n\ngo 1.22\n');
@@ -219,6 +317,24 @@ test('detectTechStack recognizes non-Node ecosystems', async (t) => {
     assert.ok(go, 'Go should be detected');
     assert.strictEqual(go.version, '1.22');
     fs.rmSync(path.join(fixtureRoot, 'go.mod'));
+  });
+
+  await t.test('Python: reads requires-python from pyproject.toml instead of guessing', () => {
+    fs.writeFileSync(path.join(fixtureRoot, 'pyproject.toml'), '[project]\nname = "app"\nrequires-python = ">=3.12"\ndependencies = [\n  "requests",\n]\n');
+    const stack = detectTechStack(fixtureRoot);
+    const python = stack.find(s => s.technology === 'Python');
+    assert.ok(python, 'Python should be detected');
+    assert.strictEqual(python.version, '>=3.12', 'The declared requires-python must be used');
+    assert.ok(stack.some(s => s.technology === 'requests'), 'pyproject dependencies should be listed');
+    fs.rmSync(path.join(fixtureRoot, 'pyproject.toml'));
+  });
+
+  await t.test('Python: reports Unknown when pyproject.toml declares no requires-python', () => {
+    fs.writeFileSync(path.join(fixtureRoot, 'pyproject.toml'), '[project]\nname = "app"\n');
+    const stack = detectTechStack(fixtureRoot);
+    const python = stack.find(s => s.technology === 'Python');
+    assert.strictEqual(python.version, 'Unknown', 'No version must be fabricated');
+    fs.rmSync(path.join(fixtureRoot, 'pyproject.toml'));
   });
 
   await t.test('Rust: reads crate dependencies from Cargo.toml', () => {
@@ -255,7 +371,7 @@ test('detectTechStack recognizes non-Node ecosystems', async (t) => {
     fs.rmSync(path.join(fixtureRoot, 'package.json'));
   });
 
-  fs.rmSync(fixtureRoot, { recursive: true, force: true });
+  cleanup(fixtureRoot);
 });
 
 test('loadTemplate falls back to provided default when template file is missing', () => {
@@ -278,11 +394,7 @@ test('CLI argument parsing (subprocess)', async (t) => {
   });
 
   await t.test('-a and --agent both route to the agent field', () => {
-    const projectDir = path.join(__dirname, 'temp-cli-args-project');
-    if (fs.existsSync(projectDir)) {
-      fs.rmSync(projectDir, { recursive: true, force: true });
-    }
-    fs.mkdirSync(projectDir, { recursive: true });
+    const projectDir = freshDir('temp-cli-args-project');
     spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
 
     spawnSync('node', [PM_JS_PATH, 'memory', 'short flag test', '-a', 'ShortFlagAgent'], { cwd: projectDir });
@@ -292,6 +404,6 @@ test('CLI argument parsing (subprocess)', async (t) => {
     assert.match(memoryContent, /Agent: ShortFlagAgent\]: short flag test/, '-a should set the agent name');
     assert.match(memoryContent, /Agent: LongFlagAgent\]: long flag test/, '--agent should set the agent name');
 
-    fs.rmSync(projectDir, { recursive: true, force: true });
+    cleanup(projectDir);
   });
 });

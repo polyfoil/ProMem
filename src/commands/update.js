@@ -1,30 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { walkProject, getRelativePath, replaceSection } from '../utils/fileops.js';
+import { walkProject, replaceSection } from '../utils/fileops.js';
+import { buildStackTableLines, buildKeyFilesLines } from '../utils/markdown.js';
 import { detectTechStack } from '../utils/detectors.js';
-import { ANATOMY_KEY_FILE_NAMES, ANATOMY_KEY_FILE_LIMIT } from '../utils/constants.js';
-
-function buildStackTableLines(techStack) {
-  const lines = ['| Layer | Technology | Version | Purpose |', '|-------|-----------|---------|---------|'];
-  for (const item of techStack) {
-    lines.push(`| ${item.layer} | ${item.technology} | ${item.version} | ${item.purpose} |`);
-  }
-  return lines;
-}
-
-function buildKeyFilesLines(allFiles, projectRoot) {
-  const lines = ['| File | Purpose |', '|------|---------|'];
-  const importantFiles = allFiles.filter(f => {
-    const name = path.basename(f);
-    const relPath = getRelativePath(f, projectRoot);
-    return ANATOMY_KEY_FILE_NAMES.has(name) || relPath.includes('src/');
-  }).slice(0, ANATOMY_KEY_FILE_LIMIT);
-
-  for (const file of importantFiles) {
-    lines.push(`| ${getRelativePath(file, projectRoot)} | (pending agent annotation) |`);
-  }
-  return lines;
-}
 
 export function runUpdate() {
   const projectRoot = process.cwd();

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { nextTxNumber, formatMemoryEntry } from '../utils/ledger.js';
 import { MEMORY_WARNING_THRESHOLD } from '../utils/constants.js';
 
 export function runStatus() {
@@ -34,7 +35,8 @@ export function runStatus() {
   if (!fs.existsSync(memoryPath)) {
     issuesFound++;
     console.warn(`[WARNING] Missing Memory.md`);
-    fs.writeFileSync(memoryPath, `# Memory — Shift Ledger\n\n- [${new Date().toISOString().split('T')[0]} 00:00 | Agent: pm-cli]: Auto-recovered Memory.md\n`);
+    const recoveryEntry = formatMemoryEntry(nextTxNumber(pmDir), 'pm-cli', 'Auto-recovered Memory.md');
+    fs.writeFileSync(memoryPath, `# Memory — Shift Ledger\n\n${recoveryEntry}`);
     console.log(`  -> [FIXED] Created Memory.md with default header`);
     fixedIssues++;
   } else {
@@ -54,11 +56,23 @@ export function runStatus() {
     }
   }
 
+  // Surface any pending compaction so the agent knows to finish it
+  const archiveDir = path.join(pmDir, 'Archive');
+  let pendingFiles = [];
+  try {
+    pendingFiles = fs.readdirSync(archiveDir).filter(f => f.endsWith('_Memory_Pending.md'));
+  } catch (err) {
+    // Archive was just recreated above if missing; a read failure here is non-fatal.
+  }
+  if (pendingFiles.length > 0) {
+    console.warn(`[WARNING] Pending compaction found: Archive/${pendingFiles[0]}. Ask your AI agent to summarize and finalize it (pm-compact skill).`);
+  }
+
   console.log('\n--- Status Report ---');
   if (issuesFound === 0) {
-    console.log('✅ ProMem structure is completely healthy.');
+    console.log('ProMem structure is completely healthy.');
   } else {
-    console.log(`⚠️ Found ${issuesFound} issues.`);
-    console.log(`🔧 Auto-fixed ${fixedIssues} issues.`);
+    console.log(`Found ${issuesFound} issues.`);
+    console.log(`Auto-fixed ${fixedIssues} issues.`);
   }
 }

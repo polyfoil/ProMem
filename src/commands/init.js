@@ -1,39 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { loadTemplate, walkProject, getRelativePath, replaceSection } from '../utils/fileops.js';
+import { loadTemplate, walkProject, replaceSection } from '../utils/fileops.js';
+import { buildStackTableLines, buildKeyFilesLines, buildBuglogTableLines } from '../utils/markdown.js';
 import { detectTechStack } from '../utils/detectors.js';
 import { scanForTodos } from '../utils/scanner.js';
-import { ANATOMY_KEY_FILE_NAMES, ANATOMY_KEY_FILE_LIMIT } from '../utils/constants.js';
-
-function buildStackTableLines(techStack) {
-  const lines = ['| Layer | Technology | Version | Purpose |', '|-------|-----------|---------|---------|'];
-  for (const item of techStack) {
-    lines.push(`| ${item.layer} | ${item.technology} | ${item.version} | ${item.purpose} |`);
-  }
-  return lines;
-}
-
-function buildKeyFilesLines(allFiles, projectRoot) {
-  const lines = ['| File | Purpose |', '|------|---------|'];
-  const importantFiles = allFiles.filter(f => {
-    const name = path.basename(f);
-    const relPath = getRelativePath(f, projectRoot);
-    return ANATOMY_KEY_FILE_NAMES.has(name) || relPath.includes('src/');
-  }).slice(0, ANATOMY_KEY_FILE_LIMIT);
-
-  for (const file of importantFiles) {
-    lines.push(`| ${getRelativePath(file, projectRoot)} | (pending agent annotation) |`);
-  }
-  return lines;
-}
-
-function buildBuglogTableLines(issues) {
-  const lines = ['| ID | Severity | Description | File(s) | Status |', '|----|----------|-------------|---------|--------|'];
-  for (const issue of issues) {
-    lines.push(`| ${issue.id} | ${issue.severity} | ${issue.description} | ${issue.file} | ${issue.status} |`);
-  }
-  return lines;
-}
+import { formatMemoryEntry } from '../utils/ledger.js';
 
 function writeStaticFiles(pmDir) {
   const staticFiles = [
@@ -76,13 +47,14 @@ function writeBuglog(pmDir, issues) {
 }
 
 function writeMemoryInit(pmDir) {
-  const today = new Date().toISOString().split('T')[0];
-  const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
   const memoryHeader = loadTemplate('04_Execution/Memory.md', `# Memory — Shift Ledger\n`);
-  const initEntry = `\n- [${today} ${time} | Agent: pm-cli]: ProMem project memory initialized successfully.\n`;
-  fs.writeFileSync(path.join(pmDir, '04_Execution', 'Memory.md'), memoryHeader.trimEnd() + '\n' + initEntry);
+  const initEntry = formatMemoryEntry(1, 'pm-cli', 'ProMem project memory initialized successfully.');
+  fs.writeFileSync(path.join(pmDir, '04_Execution', 'Memory.md'), memoryHeader.trimEnd() + '\n\n' + initEntry);
 }
 
+// The CLI never modifies existing user-maintained rule files. Merging ProMem
+// rules into an existing CLAUDE.md/.cursorrules is a consent-based agent task
+// (see the pm-init skill).
 function writeEntrypoints(projectRoot) {
   const rules = [
     {
@@ -102,19 +74,11 @@ function writeEntrypoints(projectRoot) {
   for (const rule of rules) {
     const filePath = path.join(projectRoot, rule.file);
     if (fs.existsSync(filePath)) {
-      const existingContent = fs.readFileSync(filePath, 'utf8');
-      if (!existingContent.includes('.pm/04_Execution/Memory.md')) {
-        // Prepend to top of the file
-        fs.writeFileSync(filePath, rule.content + existingContent);
-        console.log('Prepended ProMem rules to existing ' + rule.file);
-      }
-    } else {
-      // Only create if we are targeting the standard ones or they ask for it?
-      // Actually, we should probably not create AGENTS.md if it doesn't exist to avoid clutter.
-      if (rule.file !== 'AGENTS.md') {
-        fs.writeFileSync(filePath, rule.content);
-        console.log('Generated ' + rule.file + ' in project root');
-      }
+      console.log(`Found existing ${rule.file} — left untouched. Ask your AI agent to merge the ProMem operating rules into it (pm-init skill).`);
+    } else if (rule.file !== 'AGENTS.md') {
+      // AGENTS.md is only relevant when the user already maintains one.
+      fs.writeFileSync(filePath, rule.content);
+      console.log(`Generated ${rule.file} in project root`);
     }
   }
 }

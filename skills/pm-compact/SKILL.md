@@ -45,10 +45,13 @@ For each promotable entry, create a structured rule in
 
 ```markdown
 ## [Rule Title]
-- **Source:** Memory entry from [date]
+- **Source:** TX-#### ([date])
 - **Rule:** [the permanent constraint or lesson]
 - **Rationale:** [why this matters]
 ```
+
+Citing the TX id keeps the rule traceable back to the exact ledger event,
+even after the entry itself has been archived.
 
 Examples of promotable content:
 - "Library X causes memory leaks, use Library Y instead"
@@ -74,8 +77,12 @@ Format for the new `Memory.md`:
 [Your 1-2 paragraph comprehensive project history summary]
 
 ## Recent Entries
-- [Keep only the last 10 active transaction entries here]
+- [Keep only the last 10 active transaction entries here, with their original TX ids]
 ```
+
+When the summary references specific events, cite their TX ids (e.g.
+"authentication rework landed in TX-0031..TX-0038") so the full detail
+remains greppable in the Archive.
 
 ---
 

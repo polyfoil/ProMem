@@ -4,12 +4,13 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { runCli } from './src/cli.js';
 
-// Support importing the library programmatically
-// For backward compatibility (if any tool imported pm.js directly), we can export the commands
+// Programmatic API — used by the test suite and external tooling.
 export { runInit } from './src/commands/init.js';
 export { runUpdate } from './src/commands/update.js';
 export { runMemory } from './src/commands/memory.js';
 export { runCompact } from './src/commands/compact.js';
+export { runStatus } from './src/commands/status.js';
+export { runHook } from './src/commands/hook.js';
 export { detectTechStack } from './src/utils/detectors.js';
 export { scanForTodos } from './src/utils/scanner.js';
 export { loadTemplate } from './src/utils/fileops.js';

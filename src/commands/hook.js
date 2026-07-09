@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { ROOT_DIR } from '../utils/constants.js';
 
 export function runHook() {
   const projectRoot = process.cwd();
@@ -16,13 +17,20 @@ export function runHook() {
     fs.mkdirSync(hooksDir, { recursive: true });
   }
 
+  // Git hooks run under sh even on Windows, so the embedded absolute path
+  // must use forward slashes. Embedding the path makes the hook work even
+  // when 'pm' is not on the PATH (GUI git clients, cron, etc.).
+  const pmJsPath = path.join(ROOT_DIR, 'pm.js').replace(/\\/g, '/');
+
   const hookScript = `#!/bin/sh
 # ProMem Auto-Update Hook
-echo "Running ProMem auto-update..."
 if command -v pm >/dev/null 2>&1; then
   pm update
+elif [ -f "${pmJsPath}" ]; then
+  node "${pmJsPath}" update
 else
-  node pm.js update
+  echo "ProMem: 'pm' not on PATH and ${pmJsPath} not found; skipping auto-update."
+  exit 0
 fi
 
 echo ""

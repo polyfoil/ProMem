@@ -1,6 +1,6 @@
 {
   "name": "@promem/harness",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Universal Project Memory & Agent Orchestration Harness",
   "type": "module",
   "main": "pm.js",
@@ -8,6 +8,22 @@
     "promem": "./pm.js",
     "pm": "./pm.js"
   },
+  "files": [
+    "pm.js",
+    "src/",
+    "skills/",
+    "templates/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/polyfoil/ProMem.git"
+  },
+  "bugs": {
+    "url": "https://github.com/polyfoil/ProMem/issues"
+  },
+  "homepage": "https://github.com/polyfoil/ProMem#readme",
   "keywords": [
     "ai",
     "agent",
@@ -23,6 +39,6 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "test": "node tests/pm.test.js"
+    "test": "node --test tests/pm.test.js"
   }
 }

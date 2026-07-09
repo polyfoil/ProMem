@@ -159,10 +159,11 @@ Format:
 - Populate the Open Issues table with both comment-based findings (TODO/FIXME) and structural audit findings (hardcoded URLs, error handling gaps, rate limit risks) from Phase 1.4.
 - Set severity based on impact (FIXME/Critical rate-limit risks → High, TODO/minor gaps → Medium, hardcoded strings → Low).
 
-#### Agent Entrypoints (Smart Prepend)
+#### Agent Entrypoints (Consent-Based Merge)
 - Check for existing `.cursorrules`, `CLAUDE.md`, and `AGENTS.md` files in the project root.
 - If they do not exist, create them (excluding `AGENTS.md`) with the mandatory ProMem operating rules (e.g. read Brief and Cerebrum, log handoffs to Memory).
-- If they DO exist, DO NOT overwrite them. Instead, read the file and PREPEND the ProMem mandatory rules to the very top of the file, preserving all existing user rules.
+- If they DO exist, DO NOT modify them without consent — these are user-maintained files. Ask the user for approval first; upon approval, PREPEND the ProMem mandatory rules to the very top of the file, preserving all existing content. Never overwrite.
+- Note: the `pm init` CLI deliberately never touches existing entrypoint files — merging into them is this skill's (consent-gated) responsibility.
 
 #### Other Files
 Leave `Cerebrum.md`, `Memory.md`, `ADR.md`, `Vision.md`, `Roadmap.md`,
@@ -176,7 +177,7 @@ Add the first entry to `Memory.md` using the single-line transaction format
 (the same format used by the `pm memory` CLI and enforced by `pm compact`):
 
 ```markdown
-- [YYYY-MM-DD HH:MM | Agent: <your_name>]: ProMem initialized — scanned project, created .pm/ directory, populated Brief, Architecture, Anatomy, and Buglog. Next: review generated docs for accuracy.
+- [TX-0001 | YYYY-MM-DD HH:MM | Agent: <your_name>]: ProMem initialized — scanned project, created .pm/ directory, populated Brief, Architecture, Anatomy, and Buglog. Next: review generated docs for accuracy.
 ```
 
 ---

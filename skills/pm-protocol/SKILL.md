@@ -99,7 +99,7 @@ integration points define how external skills interact with ProMem:
 | Skill | Reads From | Writes To | Trigger |
 |-------|-----------|-----------|---------|
 | [`pm-init`](../pm-init/SKILL.md) | Project source tree | All 5 layers | No `.pm/` directory found |
-| [`pm-analyze`](../pm-analyze/SKILL.md) | Anatomy + full codebase | `docs/*_Analysis/` reports, Cerebrum, Buglog | User request for a deep audit |
+| [`pm-analyze`](../pm-analyze/SKILL.md) | Anatomy + full codebase | `.pm/05_Resources/Analysis/` report, Cerebrum, Buglog | User request for a deep audit |
 | [`pm-optimize`](../pm-optimize/SKILL.md) | Source code + Anatomy | Cerebrum, Buglog | User request or post-development, targeted complexity/perf scan |
 | [`pm-memory`](../pm-memory/SKILL.md) | Agent session context | Memory.md | Session end or milestone |
 | [`pm-compact`](../pm-compact/SKILL.md) | Memory.md | Cerebrum, Archive | User request |

@@ -22,7 +22,7 @@ ProMem requires exactly zero `node_modules`. We purposefully built it using only
 ### 3. True Token Economy (Physical Restriction)
 Many tools boast about saving tokens using estimated dashboards. ProMem enforces token economy through physical constraints:
 - **No Blind Scanning:** Agents do not run `ls -R` or `grep` across thousands of files. They read the 2,000-token `Anatomy.md` index once, and jump straight to the exact file they need.
-- **No Context Bloat:** The `pm compact` command physically archives old memory into the `Archive/` folder, ensuring the active `Memory.md` never exceeds a few kilobytes. Your agent only reads what matters *today*.
+- **No Context Bloat:** The `pm compact` command stages the full ledger into the `Archive/` folder; your agent then distills it into a short "The Story So Far" summary, keeping the active `Memory.md` lean (the CLI warns when it grows past a few hundred lines). Your agent only reads what matters *today*.
 
 ---
 
@@ -73,19 +73,35 @@ npm link
 Instead of copying skill files into every single agent's configuration folder, point all your agents (Claude, Codex, Gemini, Antigravity, etc.) to your central ProMem installation. When you pull an update to ProMem, all your agents instantly get the new skills.
 
 **For Gemini / Antigravity / GStack:**
-Add a reference to your `~/.gemini/config/skills.json`:
-```json
-{
-  "entries": [
-    { "path": "~/ProMem/skills" }
-  ]
+Antigravity discovers skills from the `~/.gemini/config/skills/` directory (the IDE reaches it through the `~/.gemini/antigravity/skills` symlink). Symlink the ProMem skills into it:
+
+*macOS / Linux:*
+```bash
+ln -s ~/ProMem/skills/pm-* ~/.gemini/config/skills/
+```
+
+*Windows (PowerShell — requires Developer Mode, or run the shell as administrator):*
+```powershell
+Get-ChildItem "$env:USERPROFILE\ProMem\skills" -Directory | ForEach-Object {
+  New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.gemini\config\skills\$($_.Name)" -Target $_.FullName
 }
 ```
 
+Symlinks (not copies) keep every agent on the single source of truth: pull an update once, and all agents see it immediately.
+
 **For Claude Code / Cursor / Codex:**
 Symlink the skills folder centrally:
+
+*macOS / Linux:*
 ```bash
 ln -s ~/ProMem/skills/pm-* ~/.claude/skills/
+```
+
+*Windows (PowerShell — requires Developer Mode, or run the shell as administrator):*
+```powershell
+Get-ChildItem "$env:USERPROFILE\ProMem\skills" -Directory | ForEach-Object {
+  New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\skills\$($_.Name)" -Target $_.FullName
+}
 ```
 
 ### 3. Initialize on your project
@@ -110,7 +126,7 @@ pm update
 # Log a manual handoff entry:
 pm memory "Added user login endpoint"
 
-# Compact the shift ledger:
+# Stage the shift ledger for compaction (your AI agent finalizes the summary):
 pm compact
 
 # Run health checks and auto-fix structural issues:
@@ -119,6 +135,8 @@ pm status
 # Install a Git post-commit hook for automatic updates:
 pm hook
 ```
+
+*Note: `pm hook` embeds the absolute path of your ProMem installation into the hook as a fallback, so auto-updates keep working even when `pm` is not on the PATH (GUI git clients, CI environments, etc.).*
 
 ---
 
@@ -139,8 +157,10 @@ Agents don't read your entire codebase. `Anatomy.md` provides a compact index (~
 ### Sequential Handoff (Shift Ledger)
 When one agent's quota expires, it writes a handoff note to `Memory.md`. The next agent reads the last entry and picks up exactly where the previous one left off. No parallel conflicts. No lost progress.
 
+Every ledger entry carries a sequential transaction ID (`TX-0042`). Rules in `Cerebrum.md`, issues in `Buglog.md`, and decisions in `ADR.md` can reference the exact ledger event they came from (`Source: TX-0042`), forming a lightweight, greppable relation graph across the memory files.
+
 ### Manual Compaction
-When `Memory.md` grows too large, you trigger a manual cleanup. Permanent lessons are promoted to `Cerebrum.md`. Completed work is archived. Active memory stays lean.
+When `Memory.md` grows too large, you trigger a manual cleanup. `pm compact` stages the full ledger into `Archive/` as a pending file; your AI agent (via the `pm-compact` skill) then promotes permanent lessons to `Cerebrum.md`, writes a "The Story So Far" summary into the fresh `Memory.md`, and finalizes the archive. Active memory stays lean.
 
 ---
 
