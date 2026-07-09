@@ -1,16 +1,21 @@
 import fs from 'fs';
 import path from 'path';
 import { acquireLock, releaseLock } from '../utils/lock.js';
+import { findPmRoot } from '../utils/project.js';
 import { nextTxNumber, formatTxId, formatMemoryEntry } from '../utils/ledger.js';
 import { MEMORY_WARNING_THRESHOLD } from '../utils/constants.js';
 
 export function runMemory(msg, agent = 'Developer') {
-  const projectRoot = process.cwd();
-  const pmDir = path.join(projectRoot, '.pm');
+  const found = findPmRoot();
+  if (!found) {
+    console.error('Error: no project memory (.pm/ or ProMem/) found for this project. Run "pm init" first.');
+    process.exit(1);
+  }
+  const { pmDir } = found;
   const memoryPath = path.join(pmDir, '04_Execution', 'Memory.md');
 
   if (!fs.existsSync(memoryPath)) {
-    console.error('Error: .pm/04_Execution/Memory.md not found. Make sure ProMem is initialized.');
+    console.error(`Error: ${memoryPath} not found. Run "pm status" to repair the structure.`);
     process.exit(1);
   }
 

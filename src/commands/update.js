@@ -1,17 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 import { walkProject, replaceSection } from '../utils/fileops.js';
+import { findPmRoot } from '../utils/project.js';
 import { buildStackTableLines, buildKeyFilesLines } from '../utils/markdown.js';
 import { detectTechStack } from '../utils/detectors.js';
 
 export function runUpdate() {
-  const projectRoot = process.cwd();
-  const pmDir = path.join(projectRoot, '.pm');
-
-  if (!fs.existsSync(pmDir)) {
-    console.error(`Error: .pm directory not found at ${pmDir}. Run "pm init" first.`);
+  // The brain describes one project; when run from a worktree or a
+  // subdirectory, scan the project root the brain belongs to.
+  const found = findPmRoot();
+  if (!found) {
+    console.error('Error: no project memory (.pm/ or ProMem/) found for this project. Run "pm init" first.');
     process.exit(1);
   }
+  const { projectRoot, pmDir } = found;
 
   console.log('Refreshing ProMem generated knowledge...');
   const { fileList: allFiles, tree: projectTree } = walkProject(projectRoot, projectRoot);

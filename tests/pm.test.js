@@ -16,6 +16,9 @@ function freshDir(name) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
   fs.mkdirSync(dir, { recursive: true });
+  // Isolation boundary: an empty .git dir marks the fixture as its own
+  // repository, so brain resolution never escapes into the real project.
+  fs.mkdirSync(path.join(dir, '.git'));
   return dir;
 }
 
@@ -217,6 +220,57 @@ test('pm hook installs a post-commit hook with an absolute-path fallback', async
   });
 
   cleanup(projectDir);
+});
+
+test('brain resolution: worktrees, subdirectories, split-brain guard', async (t) => {
+  const base = freshDir('temp-worktree-fixture');
+  const mainDir = path.join(base, 'main');
+  const wtDir = path.join(base, 'wt');
+
+  // Simulated main repository with a worktree registration
+  fs.mkdirSync(path.join(mainDir, '.git', 'worktrees', 'wt'), { recursive: true });
+  fs.writeFileSync(path.join(mainDir, '.git', 'worktrees', 'wt', 'commondir'), '../..\n');
+  const initResult = spawnSync('node', [PM_JS_PATH, 'init'], { cwd: mainDir });
+  assert.strictEqual(initResult.status, 0, 'init should succeed in the simulated main repo');
+
+  // Simulated worktree checkout: .git is a file pointing at the main repo
+  fs.mkdirSync(wtDir, { recursive: true });
+  fs.writeFileSync(path.join(wtDir, '.git'), `gitdir: ${path.join(mainDir, '.git', 'worktrees', 'wt')}\n`);
+
+  const mainMemoryPath = path.join(mainDir, '.pm', '04_Execution', 'Memory.md');
+
+  await t.test('pm memory from a worktree writes to the main checkout brain', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'memory', 'logged from worktree', '-a', 'WorktreeAgent'], { cwd: wtDir });
+    assert.strictEqual(result.status, 0, 'pm memory should succeed from inside a worktree');
+    const memory = fs.readFileSync(mainMemoryPath, 'utf8');
+    assert.match(memory, /Agent: WorktreeAgent\]: logged from worktree/, 'The entry must land in the main repository brain');
+  });
+
+  await t.test('pm memory from a subdirectory resolves upward to the project brain', () => {
+    const subDir = path.join(mainDir, 'src', 'deep');
+    fs.mkdirSync(subDir, { recursive: true });
+    const result = spawnSync('node', [PM_JS_PATH, 'memory', 'logged from subdir', '-a', 'SubdirAgent'], { cwd: subDir });
+    assert.strictEqual(result.status, 0, 'pm memory should succeed from a nested subdirectory');
+    const memory = fs.readFileSync(mainMemoryPath, 'utf8');
+    assert.match(memory, /Agent: SubdirAgent\]: logged from subdir/, 'The entry must land in the project root brain');
+  });
+
+  await t.test('pm init inside a worktree refuses to create a second brain', () => {
+    const result = spawnSync('node', [PM_JS_PATH, 'init'], { cwd: wtDir });
+    assert.notStrictEqual(result.status, 0, 'init must refuse when the project already has a brain');
+    assert.ok(result.stderr.toString().includes('already has a memory'), 'The refusal must explain where the existing brain lives');
+    assert.ok(!fs.existsSync(path.join(wtDir, '.pm')), 'No second .pm directory may be created');
+  });
+
+  await t.test('pm update from a worktree refreshes the main checkout brain', () => {
+    fs.writeFileSync(path.join(mainDir, 'package.json'), JSON.stringify({ name: 'wt-fixture', dependencies: { fastify: '^4.0.0' } }));
+    const result = spawnSync('node', [PM_JS_PATH, 'update'], { cwd: wtDir });
+    assert.strictEqual(result.status, 0, 'pm update should succeed from inside a worktree');
+    const arch = fs.readFileSync(path.join(mainDir, '.pm', '03_Specifications', 'Architecture.md'), 'utf8');
+    assert.ok(arch.includes('fastify'), 'Architecture must be refreshed against the main project root');
+  });
+
+  cleanup(base);
 });
 
 test('TODO scanner precision', async (t) => {

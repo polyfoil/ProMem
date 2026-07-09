@@ -5,6 +5,7 @@ import { buildStackTableLines, buildKeyFilesLines, buildBuglogTableLines } from 
 import { detectTechStack } from '../utils/detectors.js';
 import { scanForTodos } from '../utils/scanner.js';
 import { formatMemoryEntry } from '../utils/ledger.js';
+import { findPmRoot } from '../utils/project.js';
 
 function writeStaticFiles(pmDir) {
   const staticFiles = [
@@ -87,8 +88,17 @@ export function runInit() {
   const projectRoot = process.cwd();
   const pmDir = path.join(projectRoot, '.pm');
 
-  if (fs.existsSync(pmDir)) {
-    console.error(`Error: .pm directory already exists at ${pmDir}. Aborting.`);
+  // One brain per project: also refuse when the brain lives in a parent
+  // directory or in the main checkout of a git worktree (split-brain guard).
+  const existing = findPmRoot(projectRoot);
+  if (existing) {
+    if (existing.projectRoot === projectRoot) {
+      console.error(`Error: .pm directory already exists at ${existing.pmDir}. Aborting.`);
+    } else {
+      console.error(`Error: this project already has a memory at ${existing.pmDir}`);
+      console.error('(resolved from a parent directory or the main worktree checkout — ProMem keeps one brain per project).');
+      console.error('All ProMem commands resolve to that brain automatically; no init is needed here.');
+    }
     process.exit(1);
   }
 

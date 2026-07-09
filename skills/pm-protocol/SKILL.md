@@ -118,8 +118,21 @@ New skills can be added by following the pattern:
 
 ---
 
-## 5. DIRECTORY NAME CONVENTION
+## 5. DIRECTORY NAME CONVENTION & BRAIN RESOLUTION
 
 ProMem accepts either `.pm/` or `ProMem/` as the root directory name.
 When checking for ProMem presence, scan for both variants. When creating
 a new ProMem directory, follow the user's preference or default to `.pm/`.
+
+**One brain per project.** The `pm` CLI resolves the brain automatically:
+
+1. It walks up from the current directory, so commands work from any
+   subdirectory of the project.
+2. Resolution stops at the repository boundary (`.git`) — a brain never
+   comes from outside the project's own repository.
+3. Inside a **git worktree**, the brain of the main checkout is used
+   (the brain is typically gitignored and therefore absent from worktrees).
+   Agents working in worktrees read and log against the same shared brain.
+4. `pm init` refuses to create a second brain when one is already
+   resolvable — this prevents split-brain between worktrees or nested
+   directories.

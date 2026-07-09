@@ -151,6 +151,9 @@ pm hook
 | **Portability** | Locked to one vendor | Any agent, any human |
 | **Token cost** | Re-explain every session | Read once, work immediately |
 
+### One Brain Per Project (Automatic Resolution)
+You can run `pm` from anywhere inside a project. Commands walk up from the current directory to find the `.pm/` (or `ProMem/`) brain, stopping at the repository boundary. Inside a **git worktree** — where the gitignored brain is physically absent — commands automatically resolve to the main checkout's brain, so agents working in worktrees share the same ledger instead of silently losing memory. `pm init` refuses to create a second brain when one is already resolvable, preventing split-brain.
+
 ### Index-Driven Token Economy
 Agents don't read your entire codebase. `Anatomy.md` provides a compact index (~2,000 tokens) that maps every file and module. Agents consult the index, then read only what they need. **2,500 tokens instead of 100,000+.**
 

@@ -1,17 +1,25 @@
 import fs from 'fs';
 import path from 'path';
 import { ROOT_DIR } from '../utils/constants.js';
+import { resolveGitCommonDir } from '../utils/project.js';
 
 export function runHook() {
   const projectRoot = process.cwd();
-  const gitDir = path.join(projectRoot, '.git');
-  const hooksDir = path.join(gitDir, 'hooks');
-  const postCommitPath = path.join(hooksDir, 'post-commit');
 
-  if (!fs.existsSync(gitDir)) {
+  if (!fs.existsSync(path.join(projectRoot, '.git'))) {
     console.error('Error: Not a git repository (no .git folder found). Please run "git init" first.');
     process.exit(1);
   }
+
+  // Worktree-aware: hooks live in the repository's common .git directory,
+  // shared by the main checkout and all of its worktrees.
+  const gitDir = resolveGitCommonDir(projectRoot);
+  if (!gitDir) {
+    console.error('Error: could not resolve the git directory for this checkout.');
+    process.exit(1);
+  }
+  const hooksDir = path.join(gitDir, 'hooks');
+  const postCommitPath = path.join(hooksDir, 'post-commit');
 
   if (!fs.existsSync(hooksDir)) {
     fs.mkdirSync(hooksDir, { recursive: true });

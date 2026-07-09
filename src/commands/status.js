@@ -1,16 +1,17 @@
 import fs from 'fs';
 import path from 'path';
+import { findPmRoot } from '../utils/project.js';
 import { nextTxNumber, formatMemoryEntry } from '../utils/ledger.js';
 import { MEMORY_WARNING_THRESHOLD } from '../utils/constants.js';
 
 export function runStatus() {
-  const projectRoot = process.cwd();
-  const pmDir = path.join(projectRoot, '.pm');
-
-  if (!fs.existsSync(pmDir)) {
-    console.error('Error: .pm directory not found. Please run "pm init" first.');
+  const found = findPmRoot();
+  if (!found) {
+    console.error('Error: no project memory (.pm/ or ProMem/) found for this project. Run "pm init" first.');
     process.exit(1);
   }
+  const { pmDir } = found;
+  console.log(`Project memory: ${pmDir}`);
 
   let issuesFound = 0;
   let fixedIssues = 0;

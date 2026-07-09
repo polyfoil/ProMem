@@ -1,15 +1,20 @@
 import fs from 'fs';
 import path from 'path';
 import { acquireLock, releaseLock } from '../utils/lock.js';
+import { findPmRoot } from '../utils/project.js';
 
 export function runCompact() {
-  const projectRoot = process.cwd();
-  const pmDir = path.join(projectRoot, '.pm');
+  const found = findPmRoot();
+  if (!found) {
+    console.error('Error: no project memory (.pm/ or ProMem/) found for this project. Run "pm init" first.');
+    process.exit(1);
+  }
+  const { pmDir } = found;
   const memoryPath = path.join(pmDir, '04_Execution', 'Memory.md');
   const archiveDir = path.join(pmDir, 'Archive');
 
   if (!fs.existsSync(memoryPath)) {
-    console.error('Error: Memory.md not found.');
+    console.error('Error: Memory.md not found. Run "pm status" to repair the structure.');
     process.exit(1);
   }
 
@@ -20,7 +25,7 @@ export function runCompact() {
 
     const today = new Date().toISOString().split('T')[0];
     const archiveFile = path.join(archiveDir, `${today}_Memory_Pending.md`);
-    const archiveRelPath = `.pm/Archive/${today}_Memory_Pending.md`;
+    const archiveRelPath = `${path.basename(pmDir)}/Archive/${today}_Memory_Pending.md`;
 
     if (fs.existsSync(archiveFile)) {
       console.warn(`[WARNING] A compaction is already pending at: ${archiveRelPath}`);
