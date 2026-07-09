@@ -3,6 +3,12 @@
 All notable changes to ProMem are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [1.3.1] — 2026-07-10
+
+### Changed
+- `walkProject` collects tree lines in an array and joins once, removing the
+  quadratic string-copy risk on very large repositories (OPT-013).
+
 ## [1.3.0] — 2026-07-10
 
 ### Added

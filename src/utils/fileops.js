@@ -40,7 +40,9 @@ export function walkProject(dir, rootPath) {
   const fileList = [];
   const truncatedPaths = [];
   const gitignoreNames = loadGitignoreNames(rootPath);
-  let tree = '';
+  // Collected as lines and joined once — appending to a growing string
+  // copies it in full each time (quadratic on very large repositories).
+  const treeLines = [];
 
   function walk(currentDir, currentDepth, suppressTree) {
     if (currentDepth > MAX_SCAN_DEPTH) {
@@ -69,11 +71,11 @@ export function walkProject(dir, rootPath) {
       const hideSubtree = suppressTree || isHidden;
 
       if (entry.isDirectory()) {
-        if (!hideSubtree) tree += `${indent}├── ${entry.name}/\n`;
+        if (!hideSubtree) treeLines.push(`${indent}├── ${entry.name}/`);
         walk(res, currentDepth + 1, hideSubtree);
       } else {
         fileList.push(res);
-        if (!hideSubtree) tree += `${indent}├── ${entry.name}\n`;
+        if (!hideSubtree) treeLines.push(`${indent}├── ${entry.name}`);
       }
     }
   }
@@ -85,6 +87,7 @@ export function walkProject(dir, rootPath) {
     console.warn(`Warning: scan depth limit (${MAX_SCAN_DEPTH}) reached; skipped ${truncatedPaths.length} subdirectory(ies), e.g. ${sample}`);
   }
 
+  const tree = treeLines.length > 0 ? treeLines.join('\n') + '\n' : '';
   return { fileList, tree };
 }
 
