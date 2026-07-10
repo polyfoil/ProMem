@@ -14,9 +14,9 @@ Desktop.ini
 .claude/settings.local.json
 
 # Agent Entrypoint Rules (Personal Preferences)
-CLAUDE.md
-.cursorrules
-AGENTS.md
+/CLAUDE.md
+/.cursorrules
+/AGENTS.md
 
 # Node (if examples use it)
 node_modules/
