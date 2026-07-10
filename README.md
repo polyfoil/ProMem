@@ -120,7 +120,7 @@ Alternatively, you can run the zero-dependency CLI tool directly from your termi
 # Initialize ProMem in the current directory:
 pm init
 
-# Refresh generated Anatomy/Architecture sections after structural changes:
+# Refresh generated Anatomy/Architecture/Buglog sections after structural changes:
 pm update
 
 # Log a manual handoff entry:

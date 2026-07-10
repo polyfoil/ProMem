@@ -23,6 +23,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](
   (few quick retries, then give up instead of exiting).
 - Installer merges into existing `.claude/settings.json` without touching
   unrelated entries; refuses to clobber unparseable files; idempotent.
+- `pm update` now also refreshes Buglog's Open Issues from the TODO/FIXME
+  scanner — scanner rows (`ISSUE-`) are regenerated, manually added rows are
+  preserved verbatim (closes the "stale issue list" audit finding).
+- Format-drift guard test suite (`tests/format-lint.test.js`): pins the
+  canonical single-line TX ledger format across skills/templates/README,
+  pins template table headers to the code generators, and verifies every
+  `loadTemplate()` reference exists on disk (closes the P1 audit finding).
+
+### Changed
+- Agent entrypoint contents (`.cursorrules`, `CLAUDE.md`, `AGENTS.md`) moved
+  from inline strings in `init.js` to `templates/entrypoints/` — templates/
+  is now the single source of truth for all generated static content.
+
+### Decided (won't fix — deliberate scope)
+- `link.js` agent-root list stays in code (canonical registry per Cerebrum);
+  an external config file adds surface without a demonstrated need.
+- No token ledger, waste detection, daemon, or dashboard — see
+  Docs/HOOK-BEHAVIOR-SPEC.md §3 (memory-first, not a token product).
 
 ## [1.3.1] — 2026-07-10
 

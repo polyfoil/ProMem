@@ -2,8 +2,38 @@ import fs from 'fs';
 import path from 'path';
 import { walkProject, replaceSection } from '../utils/fileops.js';
 import { findPmRoot } from '../utils/project.js';
-import { buildStackTableLines, buildKeyFilesLines } from '../utils/markdown.js';
+import { buildStackTableLines, buildKeyFilesLines, buildBuglogTableLines } from '../utils/markdown.js';
 import { detectTechStack } from '../utils/detectors.js';
+import { scanForTodos } from '../utils/scanner.js';
+
+// Rows in Open Issues whose ID does not carry the scanner's ISSUE- prefix
+// were written by humans/agents and must survive a refresh untouched.
+function manualOpenIssueRows(content) {
+  const lines = content.split('\n');
+  const start = lines.findIndex(l => l.trim() === '## Open Issues');
+  if (start === -1) return [];
+  const rows = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('## ')) break;
+    const cells = line.split('|').map(c => c.trim());
+    if (cells.length < 3 || !line.trim().startsWith('|')) continue;
+    const id = cells[1];
+    if (!id || id === 'ID' || /^-+$/.test(id) || id.startsWith('ISSUE-')) continue;
+    rows.push(line);
+  }
+  return rows;
+}
+
+// Refresh the scanner-derived rows of Buglog's Open Issues (init writes them
+// once; a living project needs the same idempotent refresh path here).
+function refreshBuglog(buglogPath, allFiles, projectRoot) {
+  let content = fs.readFileSync(buglogPath, 'utf8');
+  const manualRows = manualOpenIssueRows(content);
+  const issues = scanForTodos(allFiles, projectRoot);
+  const tableLines = [...buildBuglogTableLines(issues), ...manualRows];
+  fs.writeFileSync(buglogPath, replaceSection(content, '## Open Issues', tableLines));
+}
 
 export function runUpdate() {
   // The brain describes one project; when run from a worktree or a
@@ -38,6 +68,12 @@ export function runUpdate() {
     content = replaceSection(content, '## Key Files', buildKeyFilesLines(allFiles, projectRoot));
     fs.writeFileSync(anatomyPath, content);
     updated.push('Anatomy.md (Project Root, Key Files)');
+  }
+
+  const buglogPath = path.join(pmDir, '04_Execution', 'Buglog.md');
+  if (fs.existsSync(buglogPath)) {
+    refreshBuglog(buglogPath, allFiles, projectRoot);
+    updated.push('Buglog.md (Open Issues — scanner rows; manual rows preserved)');
   }
 
   if (updated.length === 0) {

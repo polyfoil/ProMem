@@ -1,7 +1,9 @@
 # Bug Log
 
 > Track known issues, unresolved bugs, and failed approaches.
-> Updated by `pm-init` (TODO/FIXME scan) and during development.
+> Updated by `pm init` / `pm update` (TODO/FIXME scan) and during development.
+> Scanner rows carry `ISSUE-` ids and are regenerated on refresh; rows with
+> any other id are yours and are preserved verbatim.
 
 ## Open Issues
 

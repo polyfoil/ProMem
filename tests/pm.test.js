@@ -478,6 +478,22 @@ test('pm update (subprocess): errors cleanly without .pm/, refreshes after init'
     assert.ok(anatomyAfter.includes('src/newfile.js'), 'Anatomy Key Files should include the new src/ file (Windows path-separator safe)');
   });
 
+  await t.test('pm update refreshes scanner Buglog rows while preserving manual rows', () => {
+    const buglogPath = path.join(updateProjectDir, '.pm', '04_Execution', 'Buglog.md');
+    // A manually tracked issue (no ISSUE- prefix) and a new code TODO.
+    let buglog = fs.readFileSync(buglogPath, 'utf8');
+    buglog = buglog.replace('|----|----------|-------------|---------|--------|', '|----|----------|-------------|---------|--------|\n| MAN-001 | High | manually tracked defect | src/index.js | Open |');
+    fs.writeFileSync(buglogPath, buglog);
+    fs.writeFileSync(path.join(updateProjectDir, 'src', 'todo.js'), '// TODO: wire the cache layer\n');
+
+    const result = spawnSync('node', [PM_JS_PATH, 'update'], { cwd: updateProjectDir });
+    assert.strictEqual(result.status, 0, 'pm update should succeed');
+
+    const after = fs.readFileSync(buglogPath, 'utf8');
+    assert.ok(after.includes('wire the cache layer'), 'the new TODO must appear in the refreshed Open Issues');
+    assert.ok(after.includes('MAN-001'), 'manually added rows must survive the refresh');
+  });
+
   cleanup(updateProjectDir);
 });
 

@@ -62,7 +62,10 @@ function lastTxDate(pmDir) {
 // agent reads the full file when a rule becomes relevant.
 function cerebrumTitles(pmDir) {
   try {
-    const content = fs.readFileSync(path.join(pmDir, '04_Execution', 'Cerebrum.md'), 'utf8');
+    const raw = fs.readFileSync(path.join(pmDir, '04_Execution', 'Cerebrum.md'), 'utf8');
+    // Strip HTML comments first: the template documents its format inside
+    // <!-- --> blocks, and those example headings are not real rules.
+    const content = raw.replace(/<!--[\s\S]*?-->/g, '');
     return content.split('\n')
       .filter(l => /^#{2,3} /.test(l))
       .map(l => (l.startsWith('### ') ? `  - ${l.slice(4).trim()}` : `- ${l.slice(3).trim()}`));

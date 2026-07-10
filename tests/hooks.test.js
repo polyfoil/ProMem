@@ -104,6 +104,7 @@ test('hook-event session-start injects context and resets session state', async 
     const out = result.stdout.toString();
     assert.match(out, /Last handoff: - \[TX-0001/, 'the last Memory TX line must be injected');
     assert.ok(out.includes('Coding Standards'), 'Cerebrum section titles must be listed');
+    assert.ok(!out.includes('[Rule Title]'), 'example headings inside HTML comments must not leak into the context');
     assert.ok(out.includes('read Brief.md and Cerebrum.md'), 'the protocol pointer must be present');
     assert.ok(out.trim().split('\n').length < 40, 'injected context must stay under 40 lines');
   });

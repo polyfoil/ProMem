@@ -57,19 +57,13 @@ function writeMemoryInit(pmDir) {
 // rules into an existing CLAUDE.md/.cursorrules is a consent-based agent task
 // (see the pm-init skill).
 function writeEntrypoints(projectRoot) {
+  // Content lives in templates/entrypoints/ (templates/ is the SSOT);
+  // fallbacks are minimal on purpose and only cover a broken installation.
+  const fallback = '# ProMem\n\n- Read `.pm/01_Foundations/Brief.md` and `.pm/04_Execution/Cerebrum.md` before any task.\n- Locate files via `.pm/04_Execution/Anatomy.md`; log handoffs to `.pm/04_Execution/Memory.md`.\n';
   const rules = [
-    {
-      file: '.cursorrules',
-      content: `# ProMem Project Memory Configuration\n\n# Mandatory Operating Rules:\n- Before starting any task, read \`.pm/01_Foundations/Brief.md\` and \`.pm/04_Execution/Cerebrum.md\` to understand context and constraints.\n- Always consult \`.pm/04_Execution/Anatomy.md\` index before searching the codebase to save token budget.\n- When finishing a task or ending a session, record a handoff entry in \`.pm/04_Execution/Memory.md\`.\n\n`
-    },
-    {
-      file: 'CLAUDE.md',
-      content: `# ProMem Guidelines\n\n## Guidelines\n- Before starting any task, read \`.pm/01_Foundations/Brief.md\` and \`.pm/04_Execution/Cerebrum.md\`.\n- Use \`.pm/04_Execution/Anatomy.md\` to locate files instead of broad scans.\n- Log a handoff entry to \`.pm/04_Execution/Memory.md\` at the end of every session.\n\n`
-    },
-    {
-      file: 'AGENTS.md',
-      content: `# ProMem Agent Instructions\n\n- Before starting any task, read \`.pm/01_Foundations/Brief.md\` and \`.pm/04_Execution/Cerebrum.md\`.\n- Use \`.pm/04_Execution/Anatomy.md\` to locate files instead of broad scans.\n- Log a handoff entry to \`.pm/04_Execution/Memory.md\` at the end of every session.\n\n`
-    }
+    { file: '.cursorrules', content: loadTemplate('entrypoints/cursorrules', fallback) },
+    { file: 'CLAUDE.md', content: loadTemplate('entrypoints/CLAUDE.md', fallback) },
+    { file: 'AGENTS.md', content: loadTemplate('entrypoints/AGENTS.md', fallback) }
   ];
 
   for (const rule of rules) {
