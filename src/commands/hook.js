@@ -2,8 +2,19 @@ import fs from 'fs';
 import path from 'path';
 import { ROOT_DIR } from '../utils/constants.js';
 import { resolveGitCommonDir } from '../utils/project.js';
+import { runHookClaude } from './hookClaude.js';
 
-export function runHook() {
+export function runHook(target) {
+  // "pm hook claude" installs the agent-hook layer for Claude Code;
+  // bare "pm hook" keeps its original git post-commit behavior.
+  if (target === 'claude') {
+    runHookClaude();
+    return;
+  }
+  if (target) {
+    console.error(`Unknown hook target: ${target}. Supported: claude (or no argument for the git post-commit hook).`);
+    process.exit(1);
+  }
   const projectRoot = process.cwd();
 
   if (!fs.existsSync(path.join(projectRoot, '.git'))) {

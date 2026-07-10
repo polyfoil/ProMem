@@ -43,3 +43,12 @@ export const COMMENT_MARKERS = ['//', '#', '/*', '*', '<!--', '--'];
 export const LOCK_MAX_RETRIES = 10;
 export const LOCK_RETRY_MS = 500;
 export const LOCK_STALE_MS = 10 * 60 * 1000;
+
+// Agent-hook layer (pm hook-event). Hooks must never block the agent, so
+// they use few, fast lock retries and give up as a silent no-op.
+export const SESSION_FILE_NAME = '.session.json';
+export const HOOK_LOCK_RETRIES = 3;
+export const HOOK_LOCK_RETRY_MS = 100;
+export const HOOK_STDIN_TIMEOUT_MS = 2000;
+export const SESSION_START_MAX_LINES = 40;
+export const CEREBRUM_NUDGE_EDIT_COUNT = 3;

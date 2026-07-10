@@ -6,6 +6,7 @@ import { runMemory } from './commands/memory.js';
 import { runCompact } from './commands/compact.js';
 import { runStatus } from './commands/status.js';
 import { runHook } from './commands/hook.js';
+import { runHookEvent } from './commands/hookEvent.js';
 import { runLink } from './commands/link.js';
 
 export function runCli(args) {
@@ -22,6 +23,7 @@ Commands:
   compact        Archive completed entries and compress Memory.md
   status         Run health checks on .pm directory and auto-fix issues
   hook           Install a git post-commit hook for automatic updates
+  hook claude    Install the ProMem agent hooks into .claude/settings.json
   link           Link the ProMem skills into every AI agent installed on this machine
 `);
     process.exit(0);
@@ -61,8 +63,13 @@ Commands:
         runStatus();
         break;
       case 'hook':
-        runHook();
+        runHook(args[1]);
         break;
+      case 'hook-event':
+        // Agent-hook events manage their own failure policy (always exit 0)
+        // and read the event JSON from stdin asynchronously.
+        runHookEvent(args[1]);
+        return;
       case 'link':
         runLink();
         break;

@@ -3,6 +3,27 @@
 All notable changes to ProMem are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [1.4.0] — 2026-07-10
+
+### Added
+- **Agent-hook layer** (`pm hook claude` + `pm hook-event <event>`): optional,
+  Claude Code-compatible hooks whose sole job is keeping the `.pm/` brain
+  fresh and making session handoff automatic (Docs/HOOK-BEHAVIOR-SPEC.md).
+  - `session-start` injects the last Memory TX and Cerebrum rule titles as
+    session context (< 40 lines).
+  - `stop` reminds when files were edited without a Memory TX, gently asks
+    about Cerebrum after 3+ edits, and runs the `pm update` repair exactly
+    once when the brain is stale.
+  - `post-write` tracks edited files in the ephemeral `.pm/.session.json`
+    and marks the brain stale (brain-internal paths ignored).
+  - `pre-read` surfaces the target file's Anatomy description, if annotated.
+  - All events always exit 0 — no brain, malformed stdin, or a held lock
+    degrade to silent no-ops; hooks can never block the agent.
+- `tryAcquireLock` in `src/utils/lock.js`: non-fatal lock variant for hooks
+  (few quick retries, then give up instead of exiting).
+- Installer merges into existing `.claude/settings.json` without touching
+  unrelated entries; refuses to clobber unparseable files; idempotent.
+
 ## [1.3.1] — 2026-07-10
 
 ### Changed

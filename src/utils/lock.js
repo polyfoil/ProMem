@@ -37,6 +37,43 @@ function isLockStale(lockFile) {
   }
 }
 
+// Single lock attempt: create the lock file, recovering a stale one first.
+// Returns true when the lock was acquired, false when it is held by a live
+// process. Throws only on unexpected filesystem errors.
+function tryOnce(lockFile) {
+  try {
+    const fd = fs.openSync(lockFile, 'wx');
+    fs.writeSync(fd, `Locked by PID ${process.pid} at ${new Date().toISOString()}\n`);
+    fs.closeSync(fd);
+    return true;
+  } catch (err) {
+    if (err.code !== 'EEXIST') throw err;
+    if (isLockStale(lockFile)) {
+      try {
+        fs.unlinkSync(lockFile);
+      } catch (unlinkErr) {
+        // Another process may have recovered it first.
+      }
+    }
+    return false;
+  }
+}
+
+// Non-fatal variant for hooks: a few quick retries, then null. Hooks must
+// degrade to a no-op instead of exiting non-zero or blocking the agent.
+export function tryAcquireLock(pmDir, maxRetries, retryMs) {
+  const lockFile = path.join(pmDir, '.pm.lock');
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (tryOnce(lockFile)) return lockFile;
+    } catch (err) {
+      return null;
+    }
+    if (attempt < maxRetries - 1) sleep(retryMs);
+  }
+  return null;
+}
+
 export function acquireLock(pmDir) {
   const lockFile = path.join(pmDir, '.pm.lock');
   let attempts = 0;

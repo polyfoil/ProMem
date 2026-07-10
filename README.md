@@ -134,9 +134,30 @@ pm status
 
 # Install a Git post-commit hook for automatic updates:
 pm hook
+
+# Install the optional agent-hook layer for Claude Code:
+pm hook claude
 ```
 
 *Note: `pm hook` embeds the absolute path of your ProMem installation into the hook as a fallback, so auto-updates keep working even when `pm` is not on the PATH (GUI git clients, CI environments, etc.).*
+
+### Agent-Hook Layer (optional, Claude Code)
+
+`pm hook claude` merges four hook registrations into the project's
+`.claude/settings.json` (existing entries are never touched). Their only job
+is to **keep the `.pm/` brain fresh and make session handoff automatic** —
+token savings are a side effect, not the goal:
+
+| Event | What it does |
+|-------|--------------|
+| `SessionStart` | Injects the last Memory TX + Cerebrum rule titles as session context (anti-amnesia) |
+| `Stop` | Reminds when files were edited but no Memory TX was logged; refreshes Anatomy/Architecture once when stale |
+| `PostToolUse` (Write\|Edit) | Marks the brain stale and tracks edited files in ephemeral `.pm/.session.json` |
+| `PreToolUse` (Read) | Prints the file's one-line Anatomy description, if annotated |
+
+Hooks always exit 0 and degrade to silent no-ops on any failure — they can
+never block or break your actual work. ProMem behaves identically when the
+hook layer is not installed. Add `.pm/.session.json` to your `.gitignore`.
 
 ---
 
