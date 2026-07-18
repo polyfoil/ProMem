@@ -15,15 +15,21 @@ if (process.env.CHILD_LOCK_TEST) {
   try {
     const lockFile = tryAcquireLock(tempDir, 1, 0); // Only try once
     if (lockFile) {
-      // Simulate work while holding the lock
-      setTimeout(() => {
-        releaseLock(lockFile);
-        process.send('LOCKED');
-        process.exit(0);
-      }, 50);
+      process.send('LOCKED');
+      // Hold the lock and stay alive until the parent explicitly tells us to exit.
+      // This prevents the lock from being released or becoming stale while other
+      // slower CI workers are still booting up.
+      process.on('message', (msg) => {
+        if (msg === 'EXIT') {
+          releaseLock(lockFile);
+          process.exit(0);
+        }
+      });
     } else {
       process.send('DENIED');
-      process.exit(0);
+      process.on('message', (msg) => {
+        if (msg === 'EXIT') process.exit(0);
+      });
     }
   } catch (err) {
     console.error(err);
@@ -39,22 +45,34 @@ if (process.env.CHILD_LOCK_TEST) {
 
     const workersCount = 10;
     const promises = [];
+    const children = [];
 
     // Spawn multiple workers at the exact same time to create a race condition
     for (let i = 0; i < workersCount; i++) {
       promises.push(new Promise((resolve, reject) => {
         const child = fork(__filename, [], { env: { ...process.env, CHILD_LOCK_TEST: '1' } });
-        let status = 'UNKNOWN';
-        child.on('message', msg => { status = msg; });
+        children.push(child);
+        
+        child.on('message', msg => {
+          resolve(msg);
+        });
+        
+        child.on('error', err => reject(err));
+        // If it exits before sending a message, something crashed
         child.on('exit', code => {
-          if (code === 0) resolve(status);
-          else reject(new Error(`Worker exited with code ${code}`));
+          if (code !== 0) reject(new Error(`Worker exited early with code ${code}`));
         });
       }));
     }
 
+    // Wait for all workers to report their acquisition status
     const results = await Promise.all(promises);
     
+    // Now that everyone has reported, tell them all to exit safely
+    for (const child of children) {
+      child.send('EXIT');
+    }
+
     const lockedCount = results.filter(r => r === 'LOCKED').length;
     const deniedCount = results.filter(r => r === 'DENIED').length;
 
