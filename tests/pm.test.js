@@ -596,4 +596,20 @@ test('CLI argument parsing (subprocess)', async (t) => {
 
     cleanup(projectDir);
   });
+
+  // Regression test for SRN-2: literal "-a" or "--agent" inside the message
+  // text must not be silently stripped from the recorded ledger entry.
+  await t.test('literal -a/--agent words in message text are preserved (SRN-2)', () => {
+    const projectDir = freshDir('temp-cli-srn2-project');
+    spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
+
+    spawnSync('node', [PM_JS_PATH, 'memory', 'fixed -a flag in parser', '-a', 'TestBot'], { cwd: projectDir });
+    spawnSync('node', [PM_JS_PATH, 'memory', 'uses --agent option correctly', '-a', 'TestBot'], { cwd: projectDir });
+
+    const memoryContent = fs.readFileSync(path.join(projectDir, '.pm', '04_Execution', 'Memory.md'), 'utf8');
+    assert.match(memoryContent, /fixed -a flag in parser/, 'literal "-a" inside message text must be preserved');
+    assert.match(memoryContent, /uses --agent option correctly/, 'literal "--agent" inside message text must be preserved');
+
+    cleanup(projectDir);
+  });
 });

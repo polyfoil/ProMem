@@ -5,7 +5,10 @@ import { getRelativePath } from './fileops.js';
 
 export function scanForTodos(fileList, rootPath) {
   const issues = [];
-  const todoRegex = /\b(TODO|FIXME|HACK|XXX|BUG)\b/;
+  
+  // Precompile a single RegExp from the constants for maximum performance (OPT-3)
+  const markersPattern = COMMENT_MARKERS.map(m => m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const todoRegex = new RegExp(`(?:${markersPattern}).*?\\b(TODO|FIXME|HACK|XXX|BUG)\\b`);
 
   for (const file of fileList) {
     if (!TODO_SCAN_EXTENSIONS.has(path.extname(file))) continue;
@@ -18,13 +21,6 @@ export function scanForTodos(fileList, rootPath) {
         const line = lines[i];
         const match = line.match(todoRegex);
         if (!match) continue;
-
-        const keywordIdx = match.index;
-        const isInComment = COMMENT_MARKERS.some(marker => {
-          const markerIdx = line.indexOf(marker);
-          return markerIdx !== -1 && markerIdx <= keywordIdx;
-        });
-        if (!isInComment) continue;
 
         const type = match[1];
         const description = line.trim().replace(/^\/\/|^\/\*|^\*|^#|^<!--|^--/, '').trim();

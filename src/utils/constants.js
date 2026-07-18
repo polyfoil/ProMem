@@ -52,3 +52,20 @@ export const HOOK_LOCK_RETRY_MS = 100;
 export const HOOK_STDIN_TIMEOUT_MS = 2000;
 export const SESSION_START_MAX_LINES = 40;
 export const CEREBRUM_NUDGE_EDIT_COUNT = 3;
+
+export const PROMEM_DIRECTORIES = ['01_Foundations', '02_Planning', '03_Specifications', '04_Execution', '05_Resources', 'Archive'];
+
+export const FALLBACK_TEMPLATES = [
+  ['01_Foundations/Brief.md', `# Project Brief\n\n## Overview\n\n## Problem Statement\n\n## Target Audience\n\n## Scope\n\n### In Scope\n-\n\n### Out of Scope\n-\n`],
+  ['01_Foundations/Vision.md', `# Product Vision\n\n## Long-Term Vision\n\n## Core Values\n`],
+  ['02_Planning/Roadmap.md', `# Roadmap\n\n## Current Phase\n\n## Milestones\n`],
+  ['02_Planning/Backlog.md', `# Backlog\n\n## Priority Legend\n- 🔴 P0\n- 🟠 P1\n- 🟡 P2\n- 🟢 P3\n`],
+  ['03_Specifications/API_Contracts.md', `# API Contracts\n`],
+  ['03_Specifications/UI_UX_Guidelines.md', `# UI/UX Guidelines\n`],
+  ['04_Execution/Cerebrum.md', `# Cerebrum — Permanent Rules & Learnings\n`],
+  ['04_Execution/ADR.md', `# Architectural Decision Records\n`],
+  ['05_Resources/Competitors.md', `# Competitors\n`],
+  ['05_Resources/Inspirations.md', `# Inspirations\n`]
+];
+
+export const ENTRYPOINT_FALLBACK = '# ProMem\n\n- Read `.pm/01_Foundations/Brief.md` and `.pm/04_Execution/Cerebrum.md` before any task.\n- Locate files via `.pm/04_Execution/Anatomy.md`; log handoffs to `.pm/04_Execution/Memory.md`.\n';

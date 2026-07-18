@@ -76,37 +76,20 @@ export function tryAcquireLock(pmDir, maxRetries, retryMs) {
 
 export function acquireLock(pmDir) {
   const lockFile = path.join(pmDir, '.pm.lock');
-  let attempts = 0;
 
-  while (attempts < LOCK_MAX_RETRIES) {
-    try {
-      // 'wx' flag opens the file for writing, but fails if it exists
-      const fd = fs.openSync(lockFile, 'wx');
-      fs.writeSync(fd, `Locked by PID ${process.pid} at ${new Date().toISOString()}\n`);
-      fs.closeSync(fd);
-      return lockFile;
-    } catch (err) {
-      if (err.code !== 'EEXIST') throw err;
+  for (let attempt = 0; attempt < LOCK_MAX_RETRIES; attempt++) {
+    if (tryOnce(lockFile)) return lockFile;
 
-      if (isLockStale(lockFile)) {
-        console.warn('Warning: recovered a stale .pm.lock left by a dead process.');
-        try {
-          fs.unlinkSync(lockFile);
-        } catch (unlinkErr) {
-          // Another process may have recovered it first — fall through and retry.
-        }
-        attempts++;
-        continue;
-      }
-
-      attempts++;
-      if (attempts >= LOCK_MAX_RETRIES) {
-        console.error(`Error: Could not acquire lock after ${LOCK_MAX_RETRIES} attempts. Another ProMem instance is running (see ${lockFile}).`);
-        process.exit(1);
-      }
+    // tryOnce already recovered a stale lock (if any) by unlinking it; on
+    // the next iteration it will succeed. When the lock is held by a live
+    // process we wait and retry.
+    if (attempt < LOCK_MAX_RETRIES - 1) {
       sleep(LOCK_RETRY_MS);
     }
   }
+
+  console.error(`Error: Could not acquire lock after ${LOCK_MAX_RETRIES} attempts. Another ProMem instance is running (see ${lockFile}).`);
+  process.exit(1);
 }
 
 export function releaseLock(lockFile) {

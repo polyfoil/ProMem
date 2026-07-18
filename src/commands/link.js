@@ -68,9 +68,12 @@ export function runLink() {
 
   let skillDirs = [];
   try {
-    skillDirs = fs.readdirSync(skillsSrc, { withFileTypes: true })
-      .filter(e => e.isDirectory())
-      .map(e => e.name);
+    const entries = fs.readdirSync(skillsSrc, { withFileTypes: true });
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        skillDirs.push(e.name);
+      }
+    }
   } catch (err) {
     console.error(`Error: could not read the skills directory at ${skillsSrc}: ${err.message}`);
     process.exit(1);

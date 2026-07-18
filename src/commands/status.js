@@ -3,6 +3,7 @@ import path from 'path';
 import { findPmRoot } from '../utils/project.js';
 import { nextTxNumber, formatMemoryEntry } from '../utils/ledger.js';
 import { MEMORY_WARNING_THRESHOLD } from '../utils/constants.js';
+import { acquireLock, releaseLock } from '../utils/lock.js';
 
 export function runStatus() {
   const found = findPmRoot();
@@ -17,6 +18,10 @@ export function runStatus() {
   let fixedIssues = 0;
 
   console.log('Running ProMem health check...\n');
+
+  // --- Write section: directory creation and Memory.md repair under lock ---
+  const lockFile = acquireLock(pmDir);
+  try {
 
   // Check required directories
   const requiredDirs = ['01_Foundations', '02_Planning', '03_Specifications', '04_Execution', '05_Resources', 'Archive'];
@@ -56,6 +61,11 @@ export function runStatus() {
       console.warn(`[WARNING] Memory.md is getting large (${lines.length} lines). Consider running 'pm compact' via your AI agent.`);
     }
   }
+
+  } finally {
+    releaseLock(lockFile);
+  }
+  // --- End write section ---
 
   // Core layer files cannot be regenerated without a project scan — report
   // them so the user/agent knows to consult the pm-init skill, don't fabricate.

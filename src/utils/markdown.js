@@ -10,6 +10,12 @@ export function escapeCell(text) {
   return String(text).replace(/\|/g, '\\|');
 }
 
+export function buildTreeBlockLines(projectTree) {
+  const treeLines = projectTree.split('\n');
+  if (treeLines.length > 0 && treeLines[treeLines.length - 1] === '') treeLines.pop();
+  return ['```', ...treeLines, '```'];
+}
+
 export function buildStackTableLines(techStack) {
   const lines = ['| Layer | Technology | Version | Purpose |', '|-------|-----------|---------|---------|'];
   for (const item of techStack) {

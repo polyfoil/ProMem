@@ -1,33 +1,23 @@
 import fs from 'fs';
 import path from 'path';
 import { loadTemplate, walkProject, replaceSection } from '../utils/fileops.js';
-import { buildStackTableLines, buildKeyFilesLines, buildBuglogTableLines } from '../utils/markdown.js';
+import { buildStackTableLines, buildKeyFilesLines, buildBuglogTableLines, buildTreeBlockLines } from '../utils/markdown.js';
 import { detectTechStack } from '../utils/detectors.js';
 import { scanForTodos } from '../utils/scanner.js';
 import { formatMemoryEntry } from '../utils/ledger.js';
 import { findPmRoot, findGitRoot } from '../utils/project.js';
+import { PROMEM_DIRECTORIES, FALLBACK_TEMPLATES, ENTRYPOINT_FALLBACK } from '../utils/constants.js';
+import { acquireLock, releaseLock } from '../utils/lock.js';
 
 function writeStaticFiles(pmDir) {
-  const staticFiles = [
-    ['01_Foundations/Brief.md', `# Project Brief\n\n## Overview\n\n## Problem Statement\n\n## Target Audience\n\n## Scope\n\n### In Scope\n-\n\n### Out of Scope\n-\n`],
-    ['01_Foundations/Vision.md', `# Product Vision\n\n## Long-Term Vision\n\n## Core Values\n`],
-    ['02_Planning/Roadmap.md', `# Roadmap\n\n## Current Phase\n\n## Milestones\n`],
-    ['02_Planning/Backlog.md', `# Backlog\n\n## Priority Legend\n- 🔴 P0\n- 🟠 P1\n- 🟡 P2\n- 🟢 P3\n`],
-    ['03_Specifications/API_Contracts.md', `# API Contracts\n`],
-    ['03_Specifications/UI_UX_Guidelines.md', `# UI/UX Guidelines\n`],
-    ['04_Execution/Cerebrum.md', `# Cerebrum — Permanent Rules & Learnings\n`],
-    ['04_Execution/ADR.md', `# Architectural Decision Records\n`],
-    ['05_Resources/Competitors.md', `# Competitors\n`],
-    ['05_Resources/Inspirations.md', `# Inspirations\n`]
-  ];
-  for (const [relPath, fallback] of staticFiles) {
+  for (const [relPath, fallback] of FALLBACK_TEMPLATES) {
     fs.writeFileSync(path.join(pmDir, ...relPath.split('/')), loadTemplate(relPath, fallback));
   }
 }
 
 function writeArchitecture(pmDir, techStack, projectTree) {
   let archContent = loadTemplate('03_Specifications/Architecture.md', '# System Architecture\n\n## Tech Stack\n\n## Directory Structure\n');
-  const treeBlockLines = ['```', ...projectTree.split('\n').filter((_, i, arr) => i < arr.length - 1 || arr[i] !== ''), '```'];
+  const treeBlockLines = buildTreeBlockLines(projectTree);
   archContent = replaceSection(archContent, '## Tech Stack', buildStackTableLines(techStack));
   archContent = replaceSection(archContent, '## Directory Structure', treeBlockLines);
   fs.writeFileSync(path.join(pmDir, '03_Specifications', 'Architecture.md'), archContent);
@@ -35,7 +25,7 @@ function writeArchitecture(pmDir, techStack, projectTree) {
 
 function writeAnatomy(pmDir, allFiles, projectRoot, projectTree) {
   let anatomyContent = loadTemplate('04_Execution/Anatomy.md', '# Project Anatomy (Index)\n\n## Project Root\n\n## Key Files\n');
-  const treeBlockLines = ['```', ...projectTree.split('\n').filter((_, i, arr) => i < arr.length - 1 || arr[i] !== ''), '```'];
+  const treeBlockLines = buildTreeBlockLines(projectTree);
   anatomyContent = replaceSection(anatomyContent, '## Project Root', treeBlockLines);
   anatomyContent = replaceSection(anatomyContent, '## Key Files', buildKeyFilesLines(allFiles, projectRoot));
   fs.writeFileSync(path.join(pmDir, '04_Execution', 'Anatomy.md'), anatomyContent);
@@ -59,11 +49,10 @@ function writeMemoryInit(pmDir) {
 function writeEntrypoints(projectRoot) {
   // Content lives in templates/entrypoints/ (templates/ is the SSOT);
   // fallbacks are minimal on purpose and only cover a broken installation.
-  const fallback = '# ProMem\n\n- Read `.pm/01_Foundations/Brief.md` and `.pm/04_Execution/Cerebrum.md` before any task.\n- Locate files via `.pm/04_Execution/Anatomy.md`; log handoffs to `.pm/04_Execution/Memory.md`.\n';
   const rules = [
-    { file: '.cursorrules', content: loadTemplate('entrypoints/cursorrules', fallback) },
-    { file: 'CLAUDE.md', content: loadTemplate('entrypoints/CLAUDE.md', fallback) },
-    { file: 'AGENTS.md', content: loadTemplate('entrypoints/AGENTS.md', fallback) }
+    { file: '.cursorrules', content: loadTemplate('entrypoints/cursorrules', ENTRYPOINT_FALLBACK) },
+    { file: 'CLAUDE.md', content: loadTemplate('entrypoints/CLAUDE.md', ENTRYPOINT_FALLBACK) },
+    { file: 'AGENTS.md', content: loadTemplate('entrypoints/AGENTS.md', ENTRYPOINT_FALLBACK) }
   ];
 
   for (const rule of rules) {
@@ -77,10 +66,7 @@ function writeEntrypoints(projectRoot) {
   }
 }
 
-export function runInit() {
-  const projectRoot = process.cwd();
-  const pmDir = path.join(projectRoot, '.pm');
-
+function checkPreconditions(projectRoot) {
   // Never re-initialize over an existing .pm/ProMem directory at cwd, even a
   // broken one that no longer passes brain-marker detection.
   for (const name of ['.pm', 'ProMem']) {
@@ -110,36 +96,51 @@ export function runInit() {
     console.error('Run "pm init" from the repository root — ProMem keeps one brain per project, at the top.');
     process.exit(1);
   }
+}
 
-  console.log('Initializing ProMem project memory harness...');
-
-  const dirs = ['01_Foundations', '02_Planning', '03_Specifications', '04_Execution', '05_Resources', 'Archive'];
-  for (const dir of dirs) {
+function createDirectories(pmDir) {
+  for (const dir of PROMEM_DIRECTORIES) {
     fs.mkdirSync(path.join(pmDir, dir), { recursive: true });
   }
+}
 
-  console.log('Scanning project files...');
-  const { fileList: allFiles, tree: projectTree } = walkProject(projectRoot, projectRoot);
+export function runInit() {
+  const projectRoot = process.cwd();
+  const pmDir = path.join(projectRoot, '.pm');
 
-  console.log('Generating Foundations...');
-  writeStaticFiles(pmDir);
+  checkPreconditions(projectRoot);
 
-  console.log('Analyzing project architecture...');
-  const techStack = detectTechStack(projectRoot);
-  writeArchitecture(pmDir, techStack, projectTree);
+  console.log('Initializing ProMem project memory harness...');
+  createDirectories(pmDir);
 
-  console.log('Generating Anatomy map...');
-  writeAnatomy(pmDir, allFiles, projectRoot, projectTree);
+  // Lock acquired after directory creation (the lock file lives inside pmDir).
+  const lockFile = acquireLock(pmDir);
+  try {
+    console.log('Scanning project files...');
+    const { fileList: allFiles, tree: projectTree } = walkProject(projectRoot, projectRoot);
 
-  console.log('Scanning for TODOs/FIXMEs...');
-  const issues = scanForTodos(allFiles, projectRoot);
-  writeBuglog(pmDir, issues);
+    console.log('Generating Foundations...');
+    writeStaticFiles(pmDir);
 
-  writeMemoryInit(pmDir);
-  fs.writeFileSync(path.join(pmDir, 'Archive', '.gitkeep'), '');
-  writeEntrypoints(projectRoot);
+    console.log('Analyzing project architecture...');
+    const techStack = detectTechStack(projectRoot);
+    writeArchitecture(pmDir, techStack, projectTree);
 
-  console.log(`\nProMem initialized successfully in ${pmDir}`);
-  console.log(`Files mapped: ${allFiles.length}`);
-  console.log(`TODOs / Issues logged: ${issues.length}`);
+    console.log('Generating Anatomy map...');
+    writeAnatomy(pmDir, allFiles, projectRoot, projectTree);
+
+    console.log('Scanning for TODOs/FIXMEs...');
+    const issues = scanForTodos(allFiles, projectRoot);
+    writeBuglog(pmDir, issues);
+
+    writeMemoryInit(pmDir);
+    fs.writeFileSync(path.join(pmDir, 'Archive', '.gitkeep'), '');
+    writeEntrypoints(projectRoot);
+
+    console.log(`\nProMem initialized successfully in ${pmDir}`);
+    console.log(`Files mapped: ${allFiles.length}`);
+    console.log(`TODOs / Issues logged: ${issues.length}`);
+  } finally {
+    releaseLock(lockFile);
+  }
 }

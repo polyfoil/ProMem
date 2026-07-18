@@ -133,7 +133,7 @@ function handleStop() {
   }
 
   if (state.stale) {
-    runUpdate();
+    runUpdate({ skipLock: true, edits: state.edits });
     mutateSessionState(pmDir, current => (current ? { ...current, stale: false } : current));
   }
 }

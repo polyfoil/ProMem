@@ -91,6 +91,15 @@ export function walkProject(dir, rootPath) {
   return { fileList, tree };
 }
 
+/**
+ * Replace the body of a markdown section delimited by `headerText` (must start
+ * with `## `) and the next `## ` heading (or end-of-file).
+ *
+ * Everything between these two `## ` boundaries — including any `###`
+ * sub-headings — is treated as **generated content** and will be overwritten.
+ * Manual notes or agent annotations that must survive a refresh should be
+ * placed in their own `## ` section, not inside a generated one.
+ */
 export function replaceSection(content, headerText, newBodyLines) {
   const lines = content.split('\n');
   const headerIdx = lines.findIndex(l => l.trim() === headerText);
