@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { walkProject, replaceSection, getRelativePath } from '../utils/fileops.js';
+import { walkProject, replaceSection } from '../utils/fileops.js';
 import { findPmRoot } from '../utils/project.js';
-import { buildStackTableLines, buildKeyFilesLines, buildBuglogTableLines, buildTreeBlockLines } from '../utils/markdown.js';
+import { buildStackTableLines, buildKeyFilesLines, buildBuglogTableLines, buildTreeBlockLines, parseKeyFileDescriptions } from '../utils/markdown.js';
 import { detectTechStack } from '../utils/detectors.js';
 import { scanForTodos } from '../utils/scanner.js';
 import { acquireLock, releaseLock, tryAcquireLock } from '../utils/lock.js';
@@ -27,54 +27,27 @@ function manualOpenIssueRows(content) {
   return rows;
 }
 
-// Extract existing scanner issues from Buglog to support incremental scanning
-function parseScannerIssues(content) {
-  const lines = content.split('\n');
-  const start = lines.findIndex(l => l.trim() === '## Open Issues');
-  if (start === -1) return [];
-  const issues = [];
-  for (let i = start + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.startsWith('## ')) break;
-    const cells = line.split('|').map(c => c.trim());
-    if (cells.length < 6 || !line.trim().startsWith('|')) continue;
-    const id = cells[1];
-    if (id && id.startsWith('ISSUE-')) {
-      issues.push({ id, severity: cells[2], description: cells[3], file: cells[4], status: cells[5] });
-    }
-  }
-  return issues;
-}
-
 // Refresh the scanner-derived rows of Buglog's Open Issues (init writes them
 // once; a living project needs the same idempotent refresh path here).
-function refreshBuglog(buglogPath, allFiles, projectRoot, edits = []) {
-  let content = fs.readFileSync(buglogPath, 'utf8');
+//
+// Always a full rescan. An incremental variant (scan only the files the agent
+// touched, carry the other rows over from the table) lived here and was
+// removed: the scan is already bounded by an extension filter and a file-size
+// ceiling, no measurement ever showed it as a bottleneck, and re-reading the
+// table it had just written cost three defect classes — rows for files deleted
+// outside the session lived forever, files changed by anything other than the
+// agent were never rescanned, and a description containing "|" was parsed back
+// into the wrong columns. Reintroduce it only behind a measurement and tests.
+function refreshBuglog(buglogPath, allFiles, projectRoot) {
+  const content = fs.readFileSync(buglogPath, 'utf8');
   const manualRows = manualOpenIssueRows(content);
-  
-  let issues = [];
-  if (edits && edits.length > 0) {
-    // OPT-2: Incremental scan. Parse existing, remove edited ones, scan only edits.
-    const oldIssues = parseScannerIssues(content);
-    // file format in Buglog is usually "path/to/file.js:12". We split by ":"
-    const nonEditedIssues = oldIssues.filter(iss => !edits.includes(iss.file.split(':')[0]));
-    const filesToScan = allFiles.filter(f => edits.includes(getRelativePath(f, projectRoot)));
-    const newIssues = scanForTodos(filesToScan, projectRoot);
-    
-    issues = [...nonEditedIssues, ...newIssues];
-    // Re-number sequentially to maintain order and ID consistency
-    issues.forEach((iss, i) => {
-      iss.id = `ISSUE-${String(i + 1).padStart(3, '0')}`;
-    });
-  } else {
-    issues = scanForTodos(allFiles, projectRoot);
-  }
+  const issues = scanForTodos(allFiles, projectRoot);
 
   const tableLines = [...buildBuglogTableLines(issues), ...manualRows];
   fs.writeFileSync(buglogPath, replaceSection(content, '## Open Issues', tableLines));
 }
 
-export function runUpdate({ skipLock = false, edits = [] } = {}) {
+export function runUpdate({ skipLock = false } = {}) {
   // The brain describes one project; when run from a worktree or a
   // subdirectory, scan the project root the brain belongs to.
   const found = findPmRoot();
@@ -114,15 +87,19 @@ export function runUpdate({ skipLock = false, edits = [] } = {}) {
   const anatomyPath = path.join(pmDir, '04_Execution', 'Anatomy.md');
   if (fs.existsSync(anatomyPath)) {
     let content = fs.readFileSync(anatomyPath, 'utf8');
+    // Key Files is regenerated wholesale, so the annotations an agent wrote
+    // into it have to be carried across explicitly — they are the half of the
+    // index that actually saves the next session from scanning the codebase.
+    const descriptions = parseKeyFileDescriptions(content);
     content = replaceSection(content, '## Project Root', treeBlockLines);
-    content = replaceSection(content, '## Key Files', buildKeyFilesLines(allFiles, projectRoot));
+    content = replaceSection(content, '## Key Files', buildKeyFilesLines(allFiles, projectRoot, descriptions));
     fs.writeFileSync(anatomyPath, content);
-    updated.push('Anatomy.md (Project Root, Key Files)');
+    updated.push(`Anatomy.md (Project Root, Key Files — ${descriptions.size} annotation(s) preserved)`);
   }
 
   const buglogPath = path.join(pmDir, '04_Execution', 'Buglog.md');
   if (fs.existsSync(buglogPath)) {
-    refreshBuglog(buglogPath, allFiles, projectRoot, edits);
+    refreshBuglog(buglogPath, allFiles, projectRoot);
     updated.push('Buglog.md (Open Issues — scanner rows; manual rows preserved)');
   }
 

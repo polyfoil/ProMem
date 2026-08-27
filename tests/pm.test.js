@@ -613,3 +613,60 @@ test('CLI argument parsing (subprocess)', async (t) => {
     cleanup(projectDir);
   });
 });
+
+test('pm update preserves agent-written Anatomy Key Files annotations', async (t) => {
+  const projectDir = freshDir('temp-anatomy-annotation-project');
+  fs.mkdirSync(path.join(projectDir, 'src'));
+  fs.writeFileSync(path.join(projectDir, 'src', 'kept.js'), '// kept\n');
+  fs.writeFileSync(path.join(projectDir, 'src', 'gone.js'), '// gone\n');
+  fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({ name: 'anatomy-fixture' }));
+  spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
+
+  const anatomyPath = path.join(projectDir, '.pm', '04_Execution', 'Anatomy.md');
+
+  await t.test('annotations survive a refresh; newly found files get the placeholder', () => {
+    // The agent annotates Key Files exactly the way the pm-init skill instructs.
+    let anatomy = fs.readFileSync(anatomyPath, 'utf8');
+    anatomy = anatomy
+      .replace('| src/kept.js | (pending agent annotation) |', '| src/kept.js | Cache layer entry point |')
+      .replace('| src/gone.js | (pending agent annotation) |', '| src/gone.js | Doomed module |');
+    fs.writeFileSync(anatomyPath, anatomy);
+
+    fs.writeFileSync(path.join(projectDir, 'src', 'fresh.js'), '// fresh\n');
+
+    const result = spawnSync('node', [PM_JS_PATH, 'update'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0, 'pm update should succeed');
+
+    const after = fs.readFileSync(anatomyPath, 'utf8');
+    assert.ok(after.includes('| src/kept.js | Cache layer entry point |'), 'an existing annotation must survive pm update');
+    assert.ok(after.includes('| src/fresh.js | (pending agent annotation) |'), 'a newly discovered file gets the placeholder');
+    assert.ok(result.stdout.toString().includes('annotation(s) preserved'), 'the refresh should report how many annotations it carried over');
+  });
+
+  await t.test('a deleted file drops out of the table together with its annotation', () => {
+    fs.rmSync(path.join(projectDir, 'src', 'gone.js'));
+
+    assert.strictEqual(spawnSync('node', [PM_JS_PATH, 'update'], { cwd: projectDir }).status, 0);
+
+    const after = fs.readFileSync(anatomyPath, 'utf8');
+    assert.ok(!after.includes('src/gone.js'), 'a file that no longer exists must not keep a Key Files row');
+    assert.ok(!after.includes('Doomed module'), 'its stale annotation must go with it');
+    assert.ok(after.includes('| src/kept.js | Cache layer entry point |'), 'the surviving annotation stays intact');
+  });
+
+  await t.test('an annotation containing a pipe survives the round trip', () => {
+    // String.raw keeps the backslash literal — this is the escaped form the
+    // generator writes for a description that contains a pipe.
+    const annotated = String.raw`| src/kept.js | Falls back to b when a \| b is unset |`;
+    fs.writeFileSync(anatomyPath, fs.readFileSync(anatomyPath, 'utf8')
+      .replace('| src/kept.js | Cache layer entry point |', annotated));
+
+    assert.strictEqual(spawnSync('node', [PM_JS_PATH, 'update'], { cwd: projectDir }).status, 0);
+
+    const after = fs.readFileSync(anatomyPath, 'utf8');
+    assert.ok(after.includes(annotated),
+      'an escaped pipe must not shift the columns or truncate the annotation');
+  });
+
+  cleanup(projectDir);
+});

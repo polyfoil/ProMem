@@ -3,12 +3,54 @@
 All notable changes to ProMem are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [1.4.1] — 2026-08-28
+
+### Fixed
+- **`pm update` no longer erases Anatomy annotations.** The Key Files table is
+  regenerated on every refresh, so the descriptions an agent wrote there (as
+  the pm-init skill instructs) were reset to the placeholder on the next
+  refresh — including the automatic ones from the git post-commit hook and the
+  `stop` hook. The refresh now reads the existing table, carries every
+  annotation across by file path, drops the rows of files that no longer
+  exist, and reports how many it preserved. This also makes the `pre-read`
+  Anatomy card useful beyond the first commit: it reads exactly those
+  descriptions and suppresses the placeholder.
+- `splitTableRow` / `parseKeyFileDescriptions` split a generated table row on
+  its real delimiters only, so an escaped `\|` inside cell text no longer
+  shifts every following column.
+- The four references to `Docs/HOOK-BEHAVIOR-SPEC.md` (shipped source comments
+  and this changelog) pointed at a file that is not in the repository and
+  never could be — `Docs/` is gitignored. They now point at the README's
+  "Agent-Hook Layer" section; the detailed contract stays in the code comments.
+
+### Removed
+- **Incremental Buglog scanning (OPT-2).** `pm update` is a full rescan again.
+  The scan is already bounded by an extension filter and a 1 MB file ceiling
+  and was never measured as a bottleneck, while re-reading the table it had
+  just written cost three defect classes: rows for files deleted outside the
+  session survived forever, files changed by anything other than the agent
+  were never rescanned, and a description containing `|` was parsed back into
+  the wrong columns. `runUpdate` no longer takes an `edits` option.
+
+### Changed
+- `KEY_FILE_PLACEHOLDER` moved to `constants.js` — it is a contract between the
+  generator, the refresh, and the pre-read hook, and was duplicated as a
+  literal in two of them.
+- README's skill table lists all nine skills (`pm-analyze` and `pm-protocol`
+  were missing) and `tests/format-lint.test.js` now pins that table to the
+  `skills/` directory listing, the same way it already pins the ledger format.
+
+### Tests
+- Anatomy annotation lifecycle: an annotation survives a refresh, a new file
+  gets the placeholder, a deleted file drops out with its annotation, and an
+  escaped pipe survives the round trip (98 tests total).
+
 ## [1.4.0] — 2026-07-10
 
 ### Added
 - **Agent-hook layer** (`pm hook claude` + `pm hook-event <event>`): optional,
   Claude Code-compatible hooks whose sole job is keeping the `.pm/` brain
-  fresh and making session handoff automatic (Docs/HOOK-BEHAVIOR-SPEC.md).
+  fresh and making session handoff automatic (README, "Agent-Hook Layer").
   - `session-start` injects the last Memory TX and Cerebrum rule titles as
     session context (< 40 lines).
   - `stop` reminds when files were edited without a Memory TX, gently asks
@@ -40,7 +82,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](
 - `link.js` agent-root list stays in code (canonical registry per Cerebrum);
   an external config file adds surface without a demonstrated need.
 - No token ledger, waste detection, daemon, or dashboard — see
-  Docs/HOOK-BEHAVIOR-SPEC.md §3 (memory-first, not a token product).
+  the README "Agent-Hook Layer" section (memory-first, not a token product).
 
 ## [1.3.1] — 2026-07-10
 

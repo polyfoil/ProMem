@@ -26,6 +26,11 @@ export const IGNORE_DIRS = new Set([
 export const MAX_SCAN_DEPTH = 5;
 export const MEMORY_WARNING_THRESHOLD = 300;
 export const ANATOMY_KEY_FILE_LIMIT = 20;
+
+// Cross-module contract: the generator writes this into un-annotated Key File
+// rows, the refresh treats it as "no annotation yet" (so it never overwrites a
+// real one), and the pre-read hook suppresses it instead of showing it.
+export const KEY_FILE_PLACEHOLDER = '(pending agent annotation)';
 export const ANATOMY_KEY_FILE_NAMES = new Set([
   'package.json', 'pyproject.toml', 'requirements.txt', 'README.md', 'main.py', 'index.js', 'app.py', 'pm.js'
 ]);

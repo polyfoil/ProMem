@@ -7,10 +7,11 @@ import { runUpdate } from './update.js';
 import {
   HOOK_STDIN_TIMEOUT_MS,
   SESSION_START_MAX_LINES,
-  CEREBRUM_NUDGE_EDIT_COUNT
+  CEREBRUM_NUDGE_EDIT_COUNT,
+  KEY_FILE_PLACEHOLDER
 } from '../utils/constants.js';
 
-// Agent-hook layer entry point (see Docs/HOOK-BEHAVIOR-SPEC.md). Every event
+// Agent-hook layer entry point (see README, "Agent-Hook Layer"). Every event
 // reads the agent's JSON from stdin, acts on the .pm brain, and exits 0 —
 // a broken hook must never interrupt the user's actual work.
 
@@ -133,7 +134,7 @@ function handleStop() {
   }
 
   if (state.stale) {
-    runUpdate({ skipLock: true, edits: state.edits });
+    runUpdate({ skipLock: true });
     mutateSessionState(pmDir, current => (current ? { ...current, stale: false } : current));
   }
 }
@@ -180,7 +181,7 @@ function anatomyDescription(pmDir, rel) {
     const row = line.match(/^\|\s*`?([^|`]+?)`?\s*\|\s*(.+?)\s*\|\s*$/);
     if (row && row[1].trim() === rel) {
       const desc = row[2].trim();
-      if (desc && desc !== 'Purpose' && !desc.startsWith('---') && desc !== '(pending agent annotation)') return desc;
+      if (desc && desc !== 'Purpose' && !desc.startsWith('---') && desc !== KEY_FILE_PLACEHOLDER) return desc;
     }
     const bullet = line.match(/^\s*-\s+`([^`]+)`\s*[—–-]\s*(.+)$/);
     if (bullet && (bullet[1] === rel || rel.endsWith(`/${bullet[1]}`))) {

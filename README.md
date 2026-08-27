@@ -194,13 +194,18 @@ ProMem ships with a modular skill collection:
 
 | Skill | Purpose |
 |-------|---------|
+| `pm-protocol` | Operating-protocol router: points at the skill that owns the procedure you need |
 | `pm-init` | Scan a project and create the `.pm/` directory with populated templates |
 | `pm-memory` | Manage the shift ledger (handoff entries) |
 | `pm-compact` | Manual memory compaction (promote, archive, clean) |
 | `pm-query` | Read `.pm/` and answer questions about the project |
+| `pm-analyze` | Deep 5-pillar architecture and quality audit; writes one report into `.pm/05_Resources/Analysis/` |
 | `pm-optimize` | Analyze code complexity and write findings to ProMem |
 | `pm-brainstorm` | ProMem-aligned collaborative requirements and design refiner |
 | `pm-migrate` | One-way OpenWolf (`.wolf`) → ProMem migration; archives the legacy brain into `.pm/Archive/` |
+
+<!-- The rows above are pinned to the skills/ directory listing by
+     tests/format-lint.test.js — add the row when you add the skill. -->
 
 
 Each skill follows the **Unix philosophy**: do one thing well, share the same I/O (the `.pm/` directory).

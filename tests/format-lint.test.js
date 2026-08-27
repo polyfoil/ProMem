@@ -82,3 +82,16 @@ test('templates referenced by the code exist on disk', () => {
     assert.ok(fs.existsSync(path.join(ROOT, 'templates', match[1])), `templates/${match[1]} is referenced by the code but missing from templates/ (SSOT)`);
   }
 });
+
+test('the README skill table lists every skill on disk', () => {
+  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+  const onDisk = fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => entry.name);
+
+  assert.ok(onDisk.length > 0, 'the skills directory should not be empty');
+  for (const skill of onDisk) {
+    assert.ok(readme.includes(`| \`${skill}\` |`),
+      `README's skill table has no row for skills/${skill} — the published inventory has drifted from disk`);
+  }
+});
