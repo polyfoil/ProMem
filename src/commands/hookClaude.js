@@ -14,11 +14,46 @@ const HOOK_EVENTS = [
   { event: 'PreToolUse', arg: 'pre-read', matcher: 'Read' }
 ];
 
-function alreadyInstalled(groups, arg) {
-  return groups.some(group =>
-    Array.isArray(group.hooks) &&
-    group.hooks.some(h => typeof h.command === 'string' && h.command.includes(`hook-event ${arg}`))
-  );
+// Registers one event, returning what it did: 'added', 'kept', or 'refreshed'.
+// Refresh matters because the command embeds this installation's absolute
+// path: once the installation moves, the old entry fails on every event, and
+// treating "an entry exists" as "nothing to do" left it broken forever.
+function installHook(groups, arg, matcher, command) {
+  for (const group of groups) {
+    if (!Array.isArray(group.hooks)) continue;
+    for (const hook of group.hooks) {
+      if (typeof hook.command !== 'string' || !hook.command.includes(`hook-event ${arg}`)) continue;
+      if (hook.command === command) return 'kept';
+      hook.command = command;
+      return 'refreshed';
+    }
+  }
+
+  const group = { hooks: [{ type: 'command', command }] };
+  if (matcher) group.matcher = matcher;
+  groups.push(group);
+  return 'added';
+}
+
+// The ephemeral session state file must never be committed. Only an existing
+// .gitignore is appended to — creating one in a repository that deliberately
+// has none would be an unrelated change to the user's project.
+function ensureSessionIgnored(projectRoot, pmDir) {
+  const relSession = `${path.basename(pmDir)}/${SESSION_FILE_NAME}`;
+  const gitignorePath = path.join(projectRoot, '.gitignore');
+
+  let gitignore;
+  try {
+    gitignore = fs.readFileSync(gitignorePath, 'utf8');
+  } catch (err) {
+    console.log(`Hint: add "${relSession}" to your .gitignore (ephemeral session state).`);
+    return;
+  }
+  if (gitignore.includes(SESSION_FILE_NAME)) return;
+
+  const separator = gitignore.endsWith('\n') ? '' : '\n';
+  fs.appendFileSync(gitignorePath, `${separator}\n# ProMem ephemeral session state (agent-hook layer)\n${relSession}\n`);
+  console.log(`Added "${relSession}" to .gitignore (ephemeral session state).`);
 }
 
 export function runHookClaude() {
@@ -45,46 +80,28 @@ export function runHookClaude() {
   const pmJsPath = path.join(ROOT_DIR, 'pm.js').replace(/\\/g, '/');
 
   if (!settings.hooks || typeof settings.hooks !== 'object') settings.hooks = {};
-  const added = [];
-  const kept = [];
+  const outcomes = { added: [], kept: [], refreshed: [] };
 
   for (const { event, arg, matcher } of HOOK_EVENTS) {
     if (!Array.isArray(settings.hooks[event])) settings.hooks[event] = [];
-    if (alreadyInstalled(settings.hooks[event], arg)) {
-      kept.push(arg);
-      continue;
-    }
-    const group = {
-      hooks: [{ type: 'command', command: `node "${pmJsPath}" hook-event ${arg}` }]
-    };
-    if (matcher) group.matcher = matcher;
-    settings.hooks[event].push(group);
-    added.push(arg);
+    const command = `node "${pmJsPath}" hook-event ${arg}`;
+    outcomes[installHook(settings.hooks[event], arg, matcher, command)].push(arg);
   }
 
-  if (added.length === 0) {
+  const brain = findPmRoot(projectRoot);
+
+  if (outcomes.added.length === 0 && outcomes.refreshed.length === 0) {
     console.log('ProMem Claude hooks are already installed in .claude/settings.json');
+    if (brain) ensureSessionIgnored(projectRoot, brain.pmDir);
     return;
   }
 
   fs.mkdirSync(settingsDir, { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 
-  console.log(`Installed ProMem hooks (${added.join(', ')}) into ${settingsPath}`);
-  if (kept.length > 0) console.log(`Already present, kept as-is: ${kept.join(', ')}`);
+  if (outcomes.added.length > 0) console.log(`Installed ProMem hooks (${outcomes.added.join(', ')}) into ${settingsPath}`);
+  if (outcomes.refreshed.length > 0) console.log(`Repointed at this installation (${outcomes.refreshed.join(', ')}) — the previous command path was stale.`);
+  if (outcomes.kept.length > 0) console.log(`Already present, kept as-is: ${outcomes.kept.join(', ')}`);
 
-  // The ephemeral session state file should never be committed.
-  const brain = findPmRoot(projectRoot);
-  if (brain) {
-    const relSession = `${path.basename(brain.pmDir)}/${SESSION_FILE_NAME}`;
-    let gitignore = '';
-    try {
-      gitignore = fs.readFileSync(path.join(projectRoot, '.gitignore'), 'utf8');
-    } catch (err) {
-      // No .gitignore — still worth the hint.
-    }
-    if (!gitignore.includes(SESSION_FILE_NAME)) {
-      console.log(`Hint: add "${relSession}" to your .gitignore (ephemeral session state).`);
-    }
-  }
+  if (brain) ensureSessionIgnored(projectRoot, brain.pmDir);
 }

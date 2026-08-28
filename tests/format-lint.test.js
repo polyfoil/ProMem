@@ -95,3 +95,29 @@ test('the README skill table lists every skill on disk', () => {
       `README's skill table has no row for skills/${skill} — the published inventory has drifted from disk`);
   }
 });
+
+test('each skill declares the name of its own directory', () => {
+  const skillsDir = path.join(ROOT, 'skills');
+  for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const frontmatter = fs.readFileSync(path.join(skillsDir, entry.name, 'SKILL.md'), 'utf8');
+    const declared = frontmatter.match(/^name:\s*(\S+)\s*$/m);
+    assert.ok(declared, `skills/${entry.name}/SKILL.md has no name: field`);
+    assert.strictEqual(declared[1], entry.name,
+      `skills/${entry.name}/SKILL.md declares "${declared[1]}" — the directory name is how the skill is invoked, so the two must match`);
+  }
+});
+
+test('Cerebrum rule sources cite a TX id', () => {
+  // The ledger's TX ids are the relation graph between the memory documents;
+  // a Source field that cites a date or a task name instead is not greppable
+  // back to the entry it came from.
+  for (const file of DOC_FILES) {
+    const rel = path.relative(ROOT, file);
+    fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+      if (!line.includes('**Source:**')) return;
+      assert.match(line, /\*\*Source:\*\*[^\n]*TX-(\d{4}|#{4})/,
+        `${rel}:${i + 1} documents a rule source that does not cite a TX id: "${line.trim()}"`);
+    });
+  }
+});

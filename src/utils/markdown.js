@@ -63,18 +63,29 @@ export function parseKeyFileDescriptions(content) {
 
 export function buildKeyFilesLines(allFiles, projectRoot, descriptions = new Map()) {
   const lines = ['| File | Purpose |', '|------|---------|'];
-  const importantFiles = allFiles.filter(f => {
+  const eligible = allFiles.filter(f => {
     const name = path.basename(f);
     const relPath = getRelativePath(f, projectRoot);
     return ANATOMY_KEY_FILE_NAMES.has(name) || SRC_SEGMENT_RE.test(relPath);
-  }).slice(0, ANATOMY_KEY_FILE_LIMIT);
+  }).map(f => getRelativePath(f, projectRoot));
+
+  // An annotated file is a key file by definition — somebody decided it was
+  // worth describing. So the row cap rations only the un-annotated remainder.
+  // Applying the cap first (as this did until v1.4.2) silently deleted
+  // annotations as soon as a project outgrew the limit, and this repository
+  // was already past it.
+  const annotated = eligible.filter(relPath => descriptions.has(relPath)).length;
+  let budget = Math.max(0, ANATOMY_KEY_FILE_LIMIT - annotated);
 
   // Rows are driven by the files that exist now: a file that disappeared drops
   // out of the table, and its stale annotation goes with it.
-  for (const file of importantFiles) {
-    const relPath = getRelativePath(file, projectRoot);
-    const purpose = descriptions.get(relPath) || KEY_FILE_PLACEHOLDER;
-    lines.push(`| ${escapeCell(relPath)} | ${escapeCell(purpose)} |`);
+  for (const relPath of eligible) {
+    const purpose = descriptions.get(relPath);
+    if (purpose === undefined) {
+      if (budget === 0) continue;
+      budget--;
+    }
+    lines.push(`| ${escapeCell(relPath)} | ${escapeCell(purpose || KEY_FILE_PLACEHOLDER)} |`);
   }
   return lines;
 }

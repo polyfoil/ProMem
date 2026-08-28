@@ -670,3 +670,66 @@ test('pm update preserves agent-written Anatomy Key Files annotations', async (t
 
   cleanup(projectDir);
 });
+
+test('Anatomy annotations survive past the Key Files row cap', async (t) => {
+  const projectDir = freshDir('temp-anatomy-cap-project');
+  fs.mkdirSync(path.join(projectDir, 'src'));
+  // More eligible files than the cap allows, so the cap is actually binding.
+  for (let i = 1; i <= 22; i++) {
+    fs.writeFileSync(path.join(projectDir, 'src', `m${String(i).padStart(2, '0')}.js`), `// module ${i}\n`);
+  }
+  spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
+  const anatomyPath = path.join(projectDir, '.pm', '04_Execution', 'Anatomy.md');
+  const annotated = '| src/m20.js | Payment verification entry point |';
+
+  await t.test('an annotated row is never dropped to make room for an un-annotated one', () => {
+    fs.writeFileSync(anatomyPath, fs.readFileSync(anatomyPath, 'utf8')
+      .replace('| src/m20.js | (pending agent annotation) |', annotated));
+    // Sorts before every existing module, pushing the last row past the cap.
+    fs.writeFileSync(path.join(projectDir, 'src', 'm00.js'), '// sorts first\n');
+
+    const result = spawnSync('node', [PM_JS_PATH, 'update'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0, 'pm update should succeed');
+
+    assert.ok(fs.readFileSync(anatomyPath, 'utf8').includes(annotated),
+      'the cap must ration un-annotated rows, never delete an annotation');
+    assert.ok(result.stdout.toString().includes('1 annotation(s) preserved'),
+      'the reported count must describe what was written back');
+  });
+
+  await t.test('a dropped annotation is reported as dropped, not as preserved', () => {
+    // Deleting the file is the one legitimate reason to lose an annotation.
+    fs.rmSync(path.join(projectDir, 'src', 'm20.js'));
+
+    const result = spawnSync('node', [PM_JS_PATH, 'update'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0);
+
+    const out = result.stdout.toString();
+    assert.ok(out.includes('0 annotation(s) preserved'), 'a deleted file leaves no annotation to preserve');
+    assert.ok(out.includes('1 dropped'), 'the loss must be reported instead of silently counted as success');
+  });
+
+  cleanup(projectDir);
+});
+
+test('a lock held by a living process is never recovered', async (t) => {
+  const projectDir = freshDir('temp-lock-live-project');
+  spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
+  const lockFile = path.join(projectDir, '.pm', '.pm.lock');
+
+  await t.test('a failed acquisition leaves the live lock byte-for-byte intact', () => {
+    // This test runner is alive, so a lock naming its PID is never stale.
+    const contents = `Locked by PID ${process.pid} at ${new Date().toISOString()}\n`;
+    fs.writeFileSync(lockFile, contents);
+
+    const payload = JSON.stringify({ tool_input: { file_path: path.join(projectDir, 'src', 'x.js') } });
+    const result = spawnSync('node', [PM_JS_PATH, 'hook-event', 'post-write'], { cwd: projectDir, input: payload });
+
+    assert.strictEqual(result.status, 0, 'the hook must still exit 0');
+    assert.ok(fs.existsSync(lockFile), 'a live lock must never be unlinked by a competing attempt');
+    assert.strictEqual(fs.readFileSync(lockFile, 'utf8'), contents, 'a live lock must not be overwritten or recreated');
+    fs.rmSync(lockFile);
+  });
+
+  cleanup(projectDir);
+});

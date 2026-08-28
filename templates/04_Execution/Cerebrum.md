@@ -15,7 +15,7 @@
 
 <!-- Example format:
 ## [Rule Title]
-- **Source:** Memory entry from [date] / discovered during [task]
+- **Source:** TX-#### (the ledger entry where this was learned)
 - **Rule:** [the permanent constraint or lesson]
 - **Rationale:** [why this matters]
 -->

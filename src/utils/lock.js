@@ -17,23 +17,45 @@ function isProcessAlive(pid) {
   }
 }
 
+// Snapshot identifying one specific lock instance: its contents (owner PID and
+// creation time) plus its mtime. If either differs later, the lock changed
+// hands and any judgement made about the old one no longer applies.
+function lockIdentity(lockFile) {
+  try {
+    const contents = fs.readFileSync(lockFile, 'utf8');
+    return { contents, mtimeMs: fs.statSync(lockFile).mtimeMs };
+  } catch (err) {
+    return null; // Lock vanished between checks — just retry normally.
+  }
+}
+
+function sameLock(a, b) {
+  return a !== null && b !== null && a.contents === b.contents && a.mtimeMs === b.mtimeMs;
+}
+
 // A lock is stale when its owning process is gone, or when it is older than
 // LOCK_STALE_MS (covers crashed processes whose PID got recycled).
-function isLockStale(lockFile) {
-  let pid = null;
-  try {
-    const match = fs.readFileSync(lockFile, 'utf8').match(/PID (\d+)/);
-    if (match) pid = Number(match[1]);
-  } catch (err) {
-    return false; // Lock vanished between checks — just retry normally.
-  }
+function isLockStale(identity) {
+  const match = identity.contents.match(/PID (\d+)/);
+  if (match && !isProcessAlive(Number(match[1]))) return true;
+  return Date.now() - identity.mtimeMs > LOCK_STALE_MS;
+}
 
-  if (pid !== null && !isProcessAlive(pid)) return true;
+// Remove a lock only if it is still the exact one judged stale. Deciding and
+// deleting are separate syscalls, so between them the owner can exit and a
+// third process can take the lock — deleting blindly would then destroy a
+// live lock and let two writers in. Re-reading immediately before the unlink
+// narrows that window to the unlink itself; the filesystem offers nothing
+// stronger without advisory locking.
+function recoverIfStale(lockFile) {
+  const judged = lockIdentity(lockFile);
+  if (judged === null || !isLockStale(judged)) return;
+  if (!sameLock(lockIdentity(lockFile), judged)) return;
 
   try {
-    return Date.now() - fs.statSync(lockFile).mtimeMs > LOCK_STALE_MS;
-  } catch (err) {
-    return false;
+    fs.unlinkSync(lockFile);
+  } catch (unlinkErr) {
+    // Another process recovered it first.
   }
 }
 
@@ -48,13 +70,7 @@ function tryOnce(lockFile) {
     return true;
   } catch (err) {
     if (err.code !== 'EEXIST') throw err;
-    if (isLockStale(lockFile)) {
-      try {
-        fs.unlinkSync(lockFile);
-      } catch (unlinkErr) {
-        // Another process may have recovered it first.
-      }
-    }
+    recoverIfStale(lockFile);
     return false;
   }
 }

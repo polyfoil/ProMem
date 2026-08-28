@@ -133,8 +133,9 @@ function handleStop() {
     }
   }
 
-  if (state.stale) {
-    runUpdate({ skipLock: true });
+  // Only clear the flag when the repair actually ran: when the lock was held
+  // the update was skipped, and clearing anyway would strand a stale brain.
+  if (state.stale && runUpdate({ skipLock: true })) {
     mutateSessionState(pmDir, current => (current ? { ...current, stale: false } : current));
   }
 }

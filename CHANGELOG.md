@@ -3,6 +3,63 @@
 All notable changes to ProMem are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [1.4.2] — 2026-08-28
+
+### Fixed
+- **Anatomy annotations no longer die at the Key Files row cap.** v1.4.1 carried
+  annotations across a refresh, but the generator applied the 20-row cap
+  *before* looking descriptions up, so an annotated file pushed past the cap by
+  a newly added file lost its description outright — and the command still
+  reported it as preserved. An annotated file is now a key file by definition:
+  the cap rations only un-annotated rows. This repository was already over the
+  cap (22 eligible files, 20 rows), so the bug was live, not theoretical.
+- The preserved-annotation count is computed from the rows actually written
+  back rather than from the parsed map, and annotations dropped because their
+  file no longer exists are reported separately instead of counted as success.
+- **`npm test` ran only four hard-coded files.** Any test file added without
+  editing `package.json` was silently skipped, locally and in CI — verified by
+  dropping in a deliberately failing file that the suite never noticed. The
+  script now uses the test runner's own discovery.
+- Stale-lock recovery re-reads the lock immediately before unlinking it and
+  removes it only if it is byte-for-byte the lock it judged stale. Deciding and
+  deleting are separate syscalls; in between, the owner can exit and a third
+  process can take the lock, and the old code would then delete a *live* lock
+  and admit two writers. The remaining window is the unlink itself.
+- `stop` clears the brain's stale flag only when the refresh actually ran.
+  `runUpdate` now returns whether it ran; when the lock was held it returned
+  early while the caller cleared the flag anyway, stranding a stale brain.
+- `pm hook claude` repoints a registration whose command still names a pm.js
+  path from a previous installation location. Such an entry fails on every
+  event, and the installer used to report "already installed" and leave it.
+- Removed two dead imports from `src/cli.js`, left behind when the entry-point
+  logic moved to `pm.js`.
+
+### Changed
+- `pm hook claude` appends the ephemeral session-state file to an existing
+  `.gitignore` instead of only printing a hint. A project without a `.gitignore`
+  still just gets the hint — creating one would be an unrelated change.
+- The git post-commit script moved from an inline string in `hook.js` to
+  `templates/hooks/post-commit`, completing the "templates/ is the single
+  source of truth for generated static content" rule from v1.4.0. It also now
+  tells the user to re-run `pm hook` when the installation has moved.
+- `runStatus` split into four focused checks (directories, ledger, core files,
+  pending compaction), each reporting its own issue/fix counts.
+- The `pm-protocol` skill declares `name: pm-protocol`; it previously declared
+  `promem-operating-protocol`, which is not the name it is invoked by.
+- Cerebrum rule sources cite a TX id everywhere they are documented; the
+  template and two skills each taught a different `Source:` format.
+- `CHANGELOG.md` is included in the published package.
+
+### Tests
+- Key Files cap boundary: an annotated row outranks an un-annotated one when
+  the cap binds, and a dropped annotation is reported as dropped.
+- A lock held by a living process survives a competing acquisition byte-for-byte.
+- `pm hook claude` repoints a stale command path without duplicating it, and
+  writes the session-state entry into an existing `.gitignore` exactly once.
+- Format-drift guards: every skill declares its own directory name, and every
+  documented rule source cites a TX id.
+- 107 tests total (98 before), now discovered automatically.
+
 ## [1.4.1] — 2026-08-28
 
 ### Fixed

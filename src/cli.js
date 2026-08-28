@@ -1,5 +1,3 @@
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { runInit } from './commands/init.js';
 import { runUpdate } from './commands/update.js';
 import { runMemory } from './commands/memory.js';

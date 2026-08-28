@@ -85,7 +85,7 @@ If analysis reveals a pattern that should become a permanent rule:
 
 ```markdown
 ## [Optimization Rule]
-- **Source:** pm-optimize analysis from [date]
+- **Source:** TX-#### (pm-optimize analysis)
 - **Rule:** [what should always/never be done]
 - **Rationale:** [performance data or reasoning]
 ```

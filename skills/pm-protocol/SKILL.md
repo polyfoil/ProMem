@@ -1,5 +1,5 @@
 ---
-name: promem-operating-protocol
+name: pm-protocol
 description: >
   ProMem (Project Memory) framework protocol. Provides a 5-layer holistic
   memory harness for any software project. Run Init to bootstrap ProMem on

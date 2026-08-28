@@ -1,8 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 import { ROOT_DIR } from '../utils/constants.js';
+import { loadTemplate } from '../utils/fileops.js';
 import { resolveGitCommonDir } from '../utils/project.js';
 import { runHookClaude } from './hookClaude.js';
+
+// Minimal stand-in for a broken installation; templates/hooks/post-commit is
+// the source of truth.
+const HOOK_SCRIPT_FALLBACK = `#!/bin/sh
+if command -v pm >/dev/null 2>&1; then
+  pm update
+elif [ -f "{{PM_JS_PATH}}" ]; then
+  node "{{PM_JS_PATH}}" update
+fi
+`;
 
 export function runHook(target) {
   // "pm hook claude" installs the agent-hook layer for Claude Code;
@@ -41,20 +52,9 @@ export function runHook(target) {
   // when 'pm' is not on the PATH (GUI git clients, cron, etc.).
   const pmJsPath = path.join(ROOT_DIR, 'pm.js').replace(/\\/g, '/');
 
-  const hookScript = `#!/bin/sh
-# ProMem Auto-Update Hook
-if command -v pm >/dev/null 2>&1; then
-  pm update
-elif [ -f "${pmJsPath}" ]; then
-  node "${pmJsPath}" update
-else
-  echo "ProMem: 'pm' not on PATH and ${pmJsPath} not found; skipping auto-update."
-  exit 0
-fi
-
-echo ""
-echo "Reminder: Did you log your work to Memory.md? (Run: pm memory '<message>')"
-`;
+  // Script body lives in templates/ like every other generated static file.
+  const hookScript = loadTemplate('hooks/post-commit', HOOK_SCRIPT_FALLBACK)
+    .replace(/\{\{PM_JS_PATH\}\}/g, pmJsPath);
 
   if (fs.existsSync(postCommitPath)) {
     const content = fs.readFileSync(postCommitPath, 'utf8');

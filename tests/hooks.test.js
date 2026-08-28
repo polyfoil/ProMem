@@ -90,6 +90,45 @@ test('pm hook claude installs and merges .claude/settings.json', async (t) => {
     assert.strictEqual(fs.readFileSync(settingsPath, 'utf8'), '{ not json', 'the broken file must be left untouched');
   });
 
+  await t.test('a stale command path is repointed at this installation', () => {
+    // Simulates a moved/renamed ProMem checkout: the registered command still
+    // mentions the event but runs a pm.js that is no longer there.
+    const settings = {
+      hooks: {
+        SessionStart: [{ hooks: [{ type: 'command', command: 'node "D:/old/gone/pm.js" hook-event session-start' }] }]
+      }
+    };
+    fs.writeFileSync(settingsPath, JSON.stringify(settings));
+
+    const result = spawnSync('node', [PM_JS_PATH, 'hook', 'claude'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0);
+    assert.ok(result.stdout.toString().includes('Repointed'), 'a stale path must be reported as repointed, not as already installed');
+
+    const raw = fs.readFileSync(settingsPath, 'utf8');
+    assert.ok(!raw.includes('D:/old/gone/pm.js'), 'the dead path must be gone');
+    assert.strictEqual(raw.split('hook-event session-start').length - 1, 1, 'repointing must not duplicate the registration');
+  });
+
+  await t.test('the ephemeral session file is added to an existing .gitignore', () => {
+    // The relative path depends on the brain's directory name, so the entry is
+    // only written once a brain exists.
+    spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
+    const gitignorePath = path.join(projectDir, '.gitignore');
+    fs.writeFileSync(gitignorePath, 'node_modules/\n');
+    fs.rmSync(settingsPath);
+
+    const result = spawnSync('node', [PM_JS_PATH, 'hook', 'claude'], { cwd: projectDir });
+    assert.strictEqual(result.status, 0);
+
+    const gitignore = fs.readFileSync(gitignorePath, 'utf8');
+    assert.ok(gitignore.includes('.pm/.session.json'), 'the ephemeral state file must be ignored');
+    assert.ok(gitignore.includes('node_modules/'), 'existing entries must be preserved');
+
+    // Running again must not append a second copy.
+    spawnSync('node', [PM_JS_PATH, 'hook', 'claude'], { cwd: projectDir });
+    assert.strictEqual(fs.readFileSync(gitignorePath, 'utf8'), gitignore, 'a second run must not append a duplicate entry');
+  });
+
   cleanup(projectDir);
 });
 

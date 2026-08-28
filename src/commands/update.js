@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { walkProject, replaceSection } from '../utils/fileops.js';
 import { findPmRoot } from '../utils/project.js';
-import { buildStackTableLines, buildKeyFilesLines, buildBuglogTableLines, buildTreeBlockLines, parseKeyFileDescriptions } from '../utils/markdown.js';
+import { buildStackTableLines, buildKeyFilesLines, buildBuglogTableLines, buildTreeBlockLines, parseKeyFileDescriptions, splitTableRow } from '../utils/markdown.js';
 import { detectTechStack } from '../utils/detectors.js';
 import { scanForTodos } from '../utils/scanner.js';
 import { acquireLock, releaseLock, tryAcquireLock } from '../utils/lock.js';
@@ -47,6 +47,9 @@ function refreshBuglog(buglogPath, allFiles, projectRoot) {
   fs.writeFileSync(buglogPath, replaceSection(content, '## Open Issues', tableLines));
 }
 
+// Returns true when the refresh actually ran, false when it was skipped
+// because another process held the lock. Callers that clear a "stale" flag
+// must only do so on true — otherwise the repair is lost silently.
 export function runUpdate({ skipLock = false } = {}) {
   // The brain describes one project; when run from a worktree or a
   // subdirectory, scan the project root the brain belongs to.
@@ -62,7 +65,7 @@ export function runUpdate({ skipLock = false } = {}) {
   let lockFile = null;
   if (skipLock) {
     lockFile = tryAcquireLock(pmDir, HOOK_LOCK_RETRIES, HOOK_LOCK_RETRY_MS);
-    if (!lockFile) return;
+    if (!lockFile) return false;
   } else {
     lockFile = acquireLock(pmDir);
   }
@@ -91,10 +94,22 @@ export function runUpdate({ skipLock = false } = {}) {
     // into it have to be carried across explicitly — they are the half of the
     // index that actually saves the next session from scanning the codebase.
     const descriptions = parseKeyFileDescriptions(content);
+    const keyFilesLines = buildKeyFilesLines(allFiles, projectRoot, descriptions);
+
+    // Count what was actually written back, not what was read: a count taken
+    // from the parsed map would claim success even when a row never made it
+    // into the table.
+    const emitted = new Set(keyFilesLines.map(splitTableRow).filter(Boolean).map(cells => cells[0]));
+    const preserved = [...descriptions.keys()].filter(relPath => emitted.has(relPath)).length;
+    const dropped = descriptions.size - preserved;
+
     content = replaceSection(content, '## Project Root', treeBlockLines);
-    content = replaceSection(content, '## Key Files', buildKeyFilesLines(allFiles, projectRoot, descriptions));
+    content = replaceSection(content, '## Key Files', keyFilesLines);
     fs.writeFileSync(anatomyPath, content);
-    updated.push(`Anatomy.md (Project Root, Key Files — ${descriptions.size} annotation(s) preserved)`);
+
+    let note = `${preserved} annotation(s) preserved`;
+    if (dropped > 0) note += `, ${dropped} dropped (file no longer present)`;
+    updated.push(`Anatomy.md (Project Root, Key Files — ${note})`);
   }
 
   const buglogPath = path.join(pmDir, '04_Execution', 'Buglog.md');
@@ -105,12 +120,13 @@ export function runUpdate({ skipLock = false } = {}) {
 
   if (updated.length === 0) {
     console.log('Nothing to update — Architecture.md and Anatomy.md not found under .pm/.');
-    return;
+    return true;
   }
 
   console.log(`Updated: ${updated.join(', ')}`);
   console.log(`Files scanned: ${allFiles.length}`);
   console.log('\nManual sections (Module Map, Key Design Decisions, System Diagram, Data Flow) were left untouched.');
+  return true;
   } finally {
     releaseLock(lockFile);
   }

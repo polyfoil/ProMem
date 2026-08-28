@@ -1,0 +1,16 @@
+#!/bin/sh
+# ProMem Auto-Update Hook
+# {{PM_JS_PATH}} is substituted with this installation's absolute pm.js path
+# so the hook keeps working when 'pm' is not on PATH (GUI clients, cron).
+if command -v pm >/dev/null 2>&1; then
+  pm update
+elif [ -f "{{PM_JS_PATH}}" ]; then
+  node "{{PM_JS_PATH}}" update
+else
+  echo "ProMem: 'pm' not on PATH and {{PM_JS_PATH}} not found; skipping auto-update."
+  echo "ProMem: if this installation moved, re-run 'pm hook' from the new location."
+  exit 0
+fi
+
+echo ""
+echo "Reminder: Did you log your work to Memory.md? (Run: pm memory '<message>')"

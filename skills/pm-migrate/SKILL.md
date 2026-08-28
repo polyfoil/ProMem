@@ -68,7 +68,7 @@ For each rule or learning in `.wolf/cerebrum.md`, append to
 
 ```markdown
 ### Rule: [Title]
-- **Source:** OpenWolf migration ([date])
+- **Source:** TX-#### (OpenWolf migration)
 - **Rule:** [the permanent constraint or lesson]
 - **Rationale:** [why this matters — carry over if recorded, otherwise infer or mark "not recorded"]
 ```
