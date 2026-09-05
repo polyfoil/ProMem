@@ -3,6 +3,42 @@
 All notable changes to ProMem are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [1.4.3] — 2026-09-05
+
+Stability pass. No new defects were found in the 6th audit round; this release
+hardens error paths and locks in behavior that previously worked untested.
+
+### Added
+- `pm init` rolls back on failure. If any step after the directory creation
+  throws (disk full, permissions, a file lock), the incomplete `.pm/` is
+  removed and the user is told they can simply run `pm init` again. The
+  precondition check guarantees no brain existed beforehand, so removing it
+  restores the project exactly. Previously a half-written brain survived and
+  the next `pm init` refused to run because the directory already existed.
+- `ENOSPC` (disk full) and `EROFS` (read-only filesystem) are diagnosed by
+  name instead of surfacing as a raw error message.
+- Regression tests for project paths containing spaces and non-ASCII
+  characters, and for an empty project. All six commands are exercised from
+  each, and the generated post-commit hook is actually executed. This already
+  worked — it was simply never covered, and every generated artifact embeds a
+  path somewhere.
+
+### Changed
+- Error classification extracted from `runCli` into a pure `describeError`
+  function: cognitive complexity 45 → 33, cyclomatic 16 → 13. It was the one
+  genuine complexity outlier in the codebase (next highest: 26). All four
+  existing messages are unchanged.
+
+### Notes
+- A complexity audit found no algorithmic bottleneck: 89 functions, mean
+  cyclomatic 3.55, mean cognitive 6.01, maximum nested-loop depth 2 (file ×
+  line, linear in input size), no N+1 access and no unguarded recursion. The
+  bundled heuristic scanner reported 80 "HIGH" findings; all 80 were false
+  positives. See `Docs/2026-09-05_1546_complexity.md`.
+- The `pm init` rollback has no automated test: every intermediate step
+  already swallows its own errors, so there is no deterministic injection
+  point. It is defensive hardening, not a proven fix.
+
 ## [1.4.2] — 2026-08-28
 
 ### Fixed

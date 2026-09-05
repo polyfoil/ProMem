@@ -104,6 +104,20 @@ function createDirectories(pmDir) {
   }
 }
 
+// checkPreconditions guarantees no brain existed before this run, so removing
+// the directory restores the project exactly as it was. A half-written brain is
+// worse than none: the next `pm init` refuses to run because the directory
+// already exists, leaving the user stuck with no obvious way forward.
+function rollbackBrain(pmDir) {
+  try {
+    fs.rmSync(pmDir, { recursive: true, force: true });
+    console.error(`Initialization failed — removed the incomplete ${pmDir}. Nothing was left behind; you can safely run "pm init" again.`);
+  } catch (removeErr) {
+    console.error(`Initialization failed, and the incomplete brain could not be removed: ${removeErr.message}`);
+    console.error(`Delete ${pmDir} manually before running "pm init" again.`);
+  }
+}
+
 export function runInit() {
   const projectRoot = process.cwd();
   const pmDir = path.join(projectRoot, '.pm');
@@ -140,6 +154,11 @@ export function runInit() {
     console.log(`\nProMem initialized successfully in ${pmDir}`);
     console.log(`Files mapped: ${allFiles.length}`);
     console.log(`TODOs / Issues logged: ${issues.length}`);
+  } catch (err) {
+    // Removes the lock file along with the directory; the release below then
+    // finds nothing to do.
+    rollbackBrain(pmDir);
+    throw err;
   } finally {
     releaseLock(lockFile);
   }

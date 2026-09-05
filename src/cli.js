@@ -29,6 +29,27 @@ function parseMemoryArgs(rawArgs) {
   return { msg, agent };
 }
 
+// Turns a filesystem error into one actionable sentence. Commands handle their
+// own expected failures, so anything reaching here is unexpected — the user
+// gets a diagnosis, never a raw stack trace.
+function describeError(err) {
+  switch (err.code) {
+    case 'ENOENT':
+      return `Error: File or directory not found (${err.path || err.message}). Please ensure you are running this in a valid project directory.`;
+    case 'EACCES':
+    case 'EPERM':
+      return `Error: Permission denied accessing ${err.path || 'a file'}. Please check your folder permissions or run as administrator.`;
+    case 'EISDIR':
+      return `Error: Expected a file but found a directory at ${err.path || err.message}.`;
+    case 'ENOSPC':
+      return `Error: No space left on device while writing ${err.path || 'a file'}.`;
+    case 'EROFS':
+      return `Error: Cannot write to ${err.path || 'a file'} — the filesystem is read-only.`;
+    default:
+      return `Error: ${err.message}`;
+  }
+}
+
 export function runCli(args) {
   const command = args[0];
 
@@ -84,17 +105,7 @@ Commands:
         process.exit(1);
     }
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      console.error(`Error: File or directory not found (${err.path || err.message}). Please ensure you are running this in a valid project directory.`);
-    } else if (err.code === 'EACCES' || err.code === 'EPERM') {
-      console.error(`Error: Permission denied accessing ${err.path || 'a file'}. Please check your folder permissions or run as administrator.`);
-    } else if (err.code === 'EISDIR') {
-      console.error(`Error: Expected a file but found a directory at ${err.path || err.message}.`);
-    } else {
-      // Commands handle their own expected failures; anything reaching here is
-      // unexpected — show a concise message instead of a raw stack trace.
-      console.error(`Error: ${err.message}`);
-    }
+    console.error(describeError(err));
     process.exit(1);
   }
 }

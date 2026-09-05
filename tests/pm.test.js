@@ -712,6 +712,56 @@ test('Anatomy annotations survive past the Key Files row cap', async (t) => {
   cleanup(projectDir);
 });
 
+test('the full command set survives awkward project paths and empty projects', async (t) => {
+  // Paths with spaces and non-ASCII characters are ordinary on Windows and in
+  // non-English locales, and every generated artifact embeds a path somewhere
+  // (git hook script, settings.json command, relative paths in the index).
+  const awkward = [
+    ['spaces', 'temp path with spaces'],
+    ['non-ASCII', 'temp-Ölçüm-Şubesi-проект']
+  ];
+
+  for (const [label, dirName] of awkward) {
+    await t.test(`every command works from a ${label} path`, () => {
+      const projectDir = freshDir(dirName);
+      fs.mkdirSync(path.join(projectDir, 'src'));
+      fs.writeFileSync(path.join(projectDir, 'src', 'a.js'), '// TODO: wire this up\n');
+      fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({ name: 'awkward-fixture' }));
+
+      for (const args of [['init'], ['memory', 'handoff from an awkward path', '-a', 'Probe'], ['update'], ['status'], ['hook'], ['hook', 'claude']]) {
+        const result = spawnSync('node', [PM_JS_PATH, ...args], { cwd: projectDir });
+        assert.strictEqual(result.status, 0, `pm ${args.join(' ')} failed: ${result.stderr.toString()}`);
+      }
+
+      const anatomy = fs.readFileSync(path.join(projectDir, '.pm', '04_Execution', 'Anatomy.md'), 'utf8');
+      assert.ok(anatomy.includes('| src/a.js |'), 'relative paths must stay project-relative and forward-slashed');
+
+      const buglog = fs.readFileSync(path.join(projectDir, '.pm', '04_Execution', 'Buglog.md'), 'utf8');
+      assert.ok(buglog.includes('wire this up'), 'the TODO scanner must reach files under an awkward path');
+
+      // The generated git hook embeds the absolute pm.js path; it must survive
+      // being run by sh.
+      const hookResult = spawnSync('sh', [path.join(projectDir, '.git', 'hooks', 'post-commit')], { cwd: projectDir });
+      assert.strictEqual(hookResult.status, 0, `the generated post-commit hook failed: ${hookResult.stderr.toString()}`);
+
+      cleanup(projectDir);
+    });
+  }
+
+  await t.test('an empty project initializes and refreshes without error', () => {
+    const projectDir = freshDir('temp-empty-project');
+
+    for (const args of [['init'], ['update'], ['status']]) {
+      const result = spawnSync('node', [PM_JS_PATH, ...args], { cwd: projectDir });
+      assert.strictEqual(result.status, 0, `pm ${args.join(' ')} failed on an empty project: ${result.stderr.toString()}`);
+    }
+
+    const anatomy = fs.readFileSync(path.join(projectDir, '.pm', '04_Execution', 'Anatomy.md'), 'utf8');
+    assert.ok(anatomy.includes('| File | Purpose |'), 'the Key Files table header must still be written');
+    cleanup(projectDir);
+  });
+});
+
 test('a lock held by a living process is never recovered', async (t) => {
   const projectDir = freshDir('temp-lock-live-project');
   spawnSync('node', [PM_JS_PATH, 'init'], { cwd: projectDir });
