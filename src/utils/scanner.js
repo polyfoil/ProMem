@@ -13,6 +13,12 @@ export function scanForTodos(fileList, rootPath) {
   for (const file of fileList) {
     if (!TODO_SCAN_EXTENSIONS.has(path.extname(file))) continue;
 
+    // Test files write TODO/FIXME strings as fixture *data*, not as real
+    // debt. Scanning them fills Buglog with entries nobody can act on — in
+    // this repository they were 5 of 6 rows.
+    const rel = getRelativePath(file, rootPath).replace(/\\/g, '/');
+    if (rel.startsWith('tests/') || rel.startsWith('test/') || rel.includes('/tests/') || rel.includes('/test/')) continue;
+
     try {
       if (fs.statSync(file).size > TODO_SCAN_MAX_BYTES) continue;
       const content = fs.readFileSync(file, 'utf8');

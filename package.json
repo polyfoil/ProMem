@@ -1,6 +1,6 @@
 {
   "name": "@promem/harness",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "Universal Project Memory & Agent Orchestration Harness",
   "type": "module",
   "main": "pm.js",

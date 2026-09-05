@@ -3,6 +3,18 @@
 All notable changes to ProMem are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [1.4.4] — 2026-09-05
+
+### Changed
+- The TODO scanner skips files under `tests/` and `test/`. Test files write
+  `TODO`/`FIXME` strings as fixture *data*, not as real debt, so scanning them
+  filled Buglog with rows nobody could act on — in this repository they were
+  5 of 6 rows. Measured before/after on the repo itself.
+- The Cerebrum template carries the no-duplicate rule that this project's own
+  brain already had: read the whole document before adding a rule, and update
+  a related rule instead of appending a near-copy. Every brain created by
+  `pm init` now starts with it.
+
 ## [1.4.3] — 2026-09-05
 
 Stability pass. No new defects were found in the 6th audit round; this release
