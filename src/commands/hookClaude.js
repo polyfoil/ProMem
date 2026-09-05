@@ -4,7 +4,7 @@ import { ROOT_DIR, SESSION_FILE_NAME } from '../utils/constants.js';
 import { findGitRoot, findPmRoot } from '../utils/project.js';
 
 // Installer for the Claude Code adapter of the agent-hook layer
-// (README, "Agent-Hook Layer"). Merges the four hook registrations into
+// (Docs/HOOK-BEHAVIOR-SPEC.md §4). Merges the four hook registrations into
 // the project's .claude/settings.json without touching unrelated entries.
 
 const HOOK_EVENTS = [

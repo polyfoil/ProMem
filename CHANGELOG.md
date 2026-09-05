@@ -3,6 +3,19 @@
 All notable changes to ProMem are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [1.4.5] — 2026-09-05
+
+### Fixed
+- **Reverted the `Docs/HOOK-BEHAVIOR-SPEC.md` repointing from 1.4.2.** That
+  change rested on a false premise: the audit looked for the file inside a git
+  worktree, where `Docs/` never appears because it is gitignored, and concluded
+  the document did not exist. It does — it is the maintained behavior spec for
+  the agent-hook layer. The four references in `hookEvent.js`, `hookClaude.js`
+  and this changelog now point at it again.
+- Removed the accompanying changelog claim that the spec "is not in the
+  repository and never could be". `Docs/` is deliberately local-only; the
+  pointers are for the people who have it, and were working as intended.
+
 ## [1.4.4] — 2026-09-05
 
 ### Changed
@@ -123,10 +136,9 @@ hardens error paths and locks in behavior that previously worked untested.
 - `splitTableRow` / `parseKeyFileDescriptions` split a generated table row on
   its real delimiters only, so an escaped `\|` inside cell text no longer
   shifts every following column.
-- The four references to `Docs/HOOK-BEHAVIOR-SPEC.md` (shipped source comments
-  and this changelog) pointed at a file that is not in the repository and
-  never could be — `Docs/` is gitignored. They now point at the README's
-  "Agent-Hook Layer" section; the detailed contract stays in the code comments.
+- ~~The four references to `Docs/HOOK-BEHAVIOR-SPEC.md` were repointed at the
+  README.~~ **Reverted in 1.4.5 — the claim behind this was wrong; the
+  document exists.**
 
 ### Removed
 - **Incremental Buglog scanning (OPT-2).** `pm update` is a full rescan again.
@@ -155,7 +167,7 @@ hardens error paths and locks in behavior that previously worked untested.
 ### Added
 - **Agent-hook layer** (`pm hook claude` + `pm hook-event <event>`): optional,
   Claude Code-compatible hooks whose sole job is keeping the `.pm/` brain
-  fresh and making session handoff automatic (README, "Agent-Hook Layer").
+  fresh and making session handoff automatic (Docs/HOOK-BEHAVIOR-SPEC.md).
   - `session-start` injects the last Memory TX and Cerebrum rule titles as
     session context (< 40 lines).
   - `stop` reminds when files were edited without a Memory TX, gently asks
@@ -187,7 +199,7 @@ hardens error paths and locks in behavior that previously worked untested.
 - `link.js` agent-root list stays in code (canonical registry per Cerebrum);
   an external config file adds surface without a demonstrated need.
 - No token ledger, waste detection, daemon, or dashboard — see
-  the README "Agent-Hook Layer" section (memory-first, not a token product).
+  Docs/HOOK-BEHAVIOR-SPEC.md §3 (memory-first, not a token product).
 
 ## [1.3.1] — 2026-07-10
 

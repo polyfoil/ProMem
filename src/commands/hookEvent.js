@@ -11,7 +11,7 @@ import {
   KEY_FILE_PLACEHOLDER
 } from '../utils/constants.js';
 
-// Agent-hook layer entry point (see README, "Agent-Hook Layer"). Every event
+// Agent-hook layer entry point (see Docs/HOOK-BEHAVIOR-SPEC.md). Every event
 // reads the agent's JSON from stdin, acts on the .pm brain, and exits 0 —
 // a broken hook must never interrupt the user's actual work.
 
