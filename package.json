@@ -1,6 +1,6 @@
 {
   "name": "@promem/harness",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "Universal Project Memory & Agent Orchestration Harness",
   "type": "module",
   "main": "pm.js",
@@ -15,7 +15,8 @@
     "templates/",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "spec/"
   ],
   "repository": {
     "type": "git",

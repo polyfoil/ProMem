@@ -69,7 +69,15 @@ git clone https://github.com/polyfoil/ProMem.git ~/ProMem
 cd ~/ProMem
 npm link
 ```
-*Now the `pm` command is available system-wide.*
+
+Or install from GitHub without a local clone first:
+
+```bash
+npm install -g github:polyfoil/ProMem
+```
+
+Either way, `pm` (and `promem`) is available system-wide. There is no npm
+registry package yet; GitHub is the install source.
 
 ### 2. Centralized Skills Hub (For AI Agents)
 Your clone is the **single source of truth**. Instead of copying skill files into every agent's configuration folder, link them once:
@@ -266,6 +274,11 @@ Agent runs `pm memory` (Logs what it just did for the next session/agent)
 ```
 
 ---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md).
+The public agent-hook contract is [spec/hook-behavior.md](spec/hook-behavior.md).
 
 ## License
 

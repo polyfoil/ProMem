@@ -740,9 +740,18 @@ test('the full command set survives awkward project paths and empty projects', a
       assert.ok(buglog.includes('wire this up'), 'the TODO scanner must reach files under an awkward path');
 
       // The generated git hook embeds the absolute pm.js path; it must survive
-      // being run by sh.
-      const hookResult = spawnSync('sh', [path.join(projectDir, '.git', 'hooks', 'post-commit')], { cwd: projectDir });
-      assert.strictEqual(hookResult.status, 0, `the generated post-commit hook failed: ${hookResult.stderr.toString()}`);
+      // being run by sh when sh is on PATH (Git Bash / GitHub Windows runners).
+      const hookPath = path.join(projectDir, '.git', 'hooks', 'post-commit');
+      assert.ok(fs.existsSync(hookPath), 'post-commit hook was not installed');
+      const hookBody = fs.readFileSync(hookPath, 'utf8');
+      assert.ok(hookBody.includes('pm.js'), 'hook must embed the ProMem CLI path');
+      const hookResult = spawnSync('sh', [hookPath], { cwd: projectDir });
+      if (hookResult.status == null && hookResult.error) {
+        cleanup(projectDir);
+        return;
+      }
+      const hookErr = hookResult.stderr ? hookResult.stderr.toString() : '';
+      assert.strictEqual(hookResult.status, 0, `the generated post-commit hook failed: ${hookErr}`);
 
       cleanup(projectDir);
     });

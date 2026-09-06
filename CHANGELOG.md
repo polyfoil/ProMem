@@ -3,6 +3,20 @@
 All notable changes to ProMem are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [1.4.6] — 2026-09-06
+
+### Added
+- Public hook contract at `spec/hook-behavior.md` so GitHub visitors are not
+  pointed at a gitignored `Docs/` path.
+- CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, and GitHub issue/PR templates.
+
+### Changed
+- README documents `npm install -g github:polyfoil/ProMem` so the CLI can be
+  installed without waiting for a registry publish.
+- Code comments for the agent-hook layer point at `spec/hook-behavior.md`.
+- Awkward-path tests no longer crash when `sh` is missing from PATH (they still
+  require the generated post-commit hook file).
+
 ## [1.4.5] — 2026-09-05
 
 ### Fixed

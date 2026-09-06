@@ -1,0 +1,28 @@
+name: Bug report
+description: Something in the CLI, hooks, or generated .pm/ files is wrong
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      placeholder: Expected vs actual.
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: "pm status"
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: "Node 22, Windows 10"
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true

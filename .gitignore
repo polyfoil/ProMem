@@ -30,8 +30,11 @@ __pycache__/
 # ProMem local directory
 .pm/
 
-# Private documentation and analysis logs
+# Test scratch directories created by the suite
+tests/temp*/
+tests/temp */
+
+# Private documentation and analysis logs (public spec lives in spec/)
 docs/
 Docs/
-
 
