@@ -25,7 +25,8 @@ function collectMarkdownFiles(dir) {
 const DOC_FILES = [
   ...collectMarkdownFiles(path.join(ROOT, 'skills')),
   ...collectMarkdownFiles(path.join(ROOT, 'templates')),
-  path.join(ROOT, 'README.md')
+  path.join(ROOT, 'README.md'),
+  path.join(ROOT, 'README.tr.md')
 ];
 
 // The only valid ledger entry format (Cerebrum: "Single-Line Transaction
@@ -84,15 +85,17 @@ test('templates referenced by the code exist on disk', () => {
 });
 
 test('the README skill table lists every skill on disk', () => {
-  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
   const onDisk = fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true })
     .filter(entry => entry.isDirectory())
     .map(entry => entry.name);
 
   assert.ok(onDisk.length > 0, 'the skills directory should not be empty');
-  for (const skill of onDisk) {
-    assert.ok(readme.includes(`| \`${skill}\` |`),
-      `README's skill table has no row for skills/${skill} — the published inventory has drifted from disk`);
+  for (const readmeName of ['README.md', 'README.tr.md']) {
+    const readme = fs.readFileSync(path.join(ROOT, readmeName), 'utf8');
+    for (const skill of onDisk) {
+      assert.ok(readme.includes(`| \`${skill}\` |`),
+        `${readmeName}'s skill table has no row for skills/${skill} — the published inventory has drifted from disk`);
+    }
   }
 });
 

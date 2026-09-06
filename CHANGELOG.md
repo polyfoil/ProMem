@@ -9,6 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](
 - Public hook contract at `spec/hook-behavior.md` so GitHub visitors are not
   pointed at a gitignored `Docs/` path.
 - CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, and GitHub issue/PR templates.
+- Turkish README (`README.tr.md`); English README links it in the header.
 
 ### Changed
 - README documents `npm install -g github:polyfoil/ProMem` so the CLI can be

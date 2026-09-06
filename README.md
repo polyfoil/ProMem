@@ -1,3 +1,5 @@
+**Language / Dil:** **English** · [Türkçe](README.tr.md)
+
 # ProMem — Project Memory Framework
 
 [![tests](https://github.com/polyfoil/ProMem/actions/workflows/test.yml/badge.svg)](https://github.com/polyfoil/ProMem/actions/workflows/test.yml)
